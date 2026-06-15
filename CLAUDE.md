@@ -12,20 +12,6 @@
 - หลักการหลัก: กรอกเร็วผิดยาก · ภาคสนาม(มือถือ)มาก่อน · เข้าใจง่ายสำหรับคนไม่ถนัดเทค · น่าเชื่อถือไม่ราชการเก่า · ตรงมาตรฐาน สสส./AUDIT
 - งานออกแบบ/ปรับ UI ใช้ `/impeccable <command>` (craft·critique·polish·layout·…)
 
-## 🔄 Rename log: SSS Impact → Healthy Impact
-เปลี่ยนชื่อโปรเจกต์ทั้งหมดจาก `sss-impact` / "SSS Impact" → `healthy-impact` / "Healthy Impact" (ตัด สสส/sss ออกจาก UI) — **เสร็จแล้วในโค้ด:**
-- Slug: `package.json` name, cookie `healthy-impact.session-token` (`proxy.ts` + `authOptions.ts`), email domain `noreply@healthy-impact.local`, `.env` (`DATABASE_URL`, `NEXTAUTH_SECRET`)
-- Branding: หน้าแรก / sidebar / login / signup / อีเมล reset / `<title>` → **Healthy Impact**, badge `สสส` → `HI`, ข้อความ "ตัวชี้วัด สสส." → "ด้านสุขภาวะ"
-- favicon `app/icon.svg` → พื้นเขียว `#16A34A` ตัวอักษร `HI` ขาว
-- DB: สร้าง `healthy-impact` ใหม่ + `prisma migrate deploy` แล้ว (DB เดิม `sss-impact` ยังอยู่ ไม่ได้ลบ)
-
-**⏳ ยังเหลือ: rename โฟลเดอร์ filesystem** `/Applications/MAMP/htdocs/sss-impact` → `/Applications/MAMP/htdocs/healthy-impact`
-หลัง rename โฟลเดอร์เสร็จ ให้ทำต่อ:
-1. เปิด Claude Code / terminal ใหม่ที่ path `/Applications/MAMP/htdocs/healthy-impact`
-2. `npm run dev` แล้วเช็คว่าเปิด `http://localhost:3000` ได้ — paths ในโค้ดเป็น relative ทั้งหมด ไม่ต้องแก้
-3. ถ้าตั้ง deploy/PM2/nginx ที่อ้าง path เดิมไว้ ต้องอัปเดต path ด้วย
-4. cookie name เปลี่ยน → session ที่ login ค้างจะหลุด ต้อง login ใหม่ (ปกติ)
-
 ## Tech Stack
 | Layer | Technology |
 |-------|-----------|
