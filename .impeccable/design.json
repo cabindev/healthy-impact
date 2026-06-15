@@ -1,0 +1,115 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-06-12T00:00:00.000Z",
+  "title": "Design System: Healthy Impact",
+  "extensions": {
+    "colorMeta": {
+      "field-green": { "role": "primary", "displayName": "เขียวสาธารณสุข / Field Green", "canonical": "#16A34A", "tonalRamp": ["#052e16", "#14532d", "#166534", "#15803d", "#16a34a", "#22c55e", "#4ade80", "#bbf7d0"] },
+      "ink": { "role": "neutral", "displayName": "Ink", "canonical": "#1F2937", "tonalRamp": ["#030712", "#111827", "#1f2937", "#374151", "#6b7280", "#9ca3af", "#e5e7eb", "#f9fafb"] },
+      "risk-low": { "role": "tertiary", "displayName": "Risk Low", "canonical": "#059669", "tonalRamp": ["#022c22", "#064e3b", "#065f46", "#047857", "#059669", "#10b981", "#6ee7b7", "#d1fae5"] },
+      "risk-critical": { "role": "tertiary", "displayName": "Risk Critical", "canonical": "#DC2626", "tonalRamp": ["#450a0a", "#7f1d1d", "#991b1b", "#b91c1c", "#dc2626", "#ef4444", "#fca5a5", "#fee2e2"] }
+    },
+    "typographyMeta": {
+      "headline": { "displayName": "Headline", "purpose": "ชื่อหน้า — ใหญ่สุดในระบบ product นี้ (1.25rem)" },
+      "numeric": { "displayName": "Numeric (mono)", "purpose": "คะแนน/ปริมาณ/เกณฑ์ที่ต้องเทียบค่า ใช้ monospace เสมอ" }
+    },
+    "shadows": [
+      { "name": "overlay-float", "value": "0 10px 25px rgba(0,0,0,0.10)", "purpose": "tooltip, dropdown ตำบล — ของที่ลอยชั่วคราวเหนือ flow" },
+      { "name": "modal-lift", "value": "0 25px 50px -12px rgba(0,0,0,0.25)", "purpose": "popup วิธีคิดคะแนน (modal กลางจอ)" }
+    ],
+    "motion": [
+      { "name": "state", "value": "150ms ease (transition-colors)", "purpose": "เปลี่ยนสีปุ่ม/ตัวเลือก/โฟกัส" },
+      { "name": "sidebar", "value": "300ms ease (transition-all)", "purpose": "ย่อ/ขยาย sidebar และเลื่อนเข้า-ออกบนมือถือ" }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "lg", "value": "1024px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "การกระทำหลักหนึ่งเดียวต่อหน้าจอ (บันทึก/เพิ่ม).",
+      "html": "<button class=\"ds-btn-primary\">บันทึกแบบสอบถาม</button>",
+      "css": ".ds-btn-primary { background: #16A34A; color: #fff; font-size: .875rem; font-weight: 600; padding: 10px 24px; border: none; border-radius: 8px; cursor: pointer; transition: background .15s ease; } .ds-btn-primary:hover { background: #15803D; } .ds-btn-primary:focus-visible { outline: 2px solid #22C55E; outline-offset: 2px; }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "ช่องกรอกมาตรฐาน — โฟกัสเปลี่ยนสีขอบไม่มี glow.",
+      "html": "<input class=\"ds-input\" placeholder=\"พิมพ์ข้อมูล...\" />",
+      "css": ".ds-input { display: block; width: 100%; background: #fff; color: #1F2937; font-size: .875rem; border: 1px solid #E5E7EB; border-radius: 8px; padding: 8px 12px; } .ds-input::placeholder { color: #9CA3AF; } .ds-input:focus { outline: none; border-color: #22C55E; }"
+    },
+    {
+      "name": "Choice Pill",
+      "kind": "chip",
+      "refersTo": "choice",
+      "description": "ตัวเลือก radio/checkbox แบบปุ่ม — เลือกแล้วพื้นเขียวอ่อน.",
+      "html": "<button class=\"ds-choice\">ดื่ม 2–3 ครั้ง/สัปดาห์</button><button class=\"ds-choice ds-choice--on\">ไม่เคยดื่มเลย</button>",
+      "css": ".ds-choice { text-align: left; background: #fff; color: #4B5563; font-size: .875rem; padding: 8px 12px; border: 1px solid #E5E7EB; border-radius: 8px; cursor: pointer; transition: border-color .15s, background .15s; } .ds-choice:hover { border-color: #D1D5DB; } .ds-choice--on { border-color: #22C55E; background: #F0FDF4; color: #111827; font-weight: 500; }"
+    },
+    {
+      "name": "Section Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "การ์ดหัวข้อในฟอร์ม — แบน ขอบบาง ไม่มีเงา.",
+      "html": "<section class=\"ds-card\"><div class=\"ds-card__head\"><span class=\"ds-card__no\">1</span><h2 class=\"ds-card__title\">ข้อมูลทั่วไป</h2></div></section>",
+      "css": ".ds-card { background: #fff; border: 1px solid #F3F4F6; border-radius: 12px; overflow: hidden; } .ds-card__head { display: flex; align-items: center; gap: 12px; padding: 12px 20px; border-bottom: 1px solid #F3F4F6; } .ds-card__no { width: 28px; height: 28px; border-radius: 8px; background: #16A34A; color: #fff; font-size: .875rem; font-weight: 600; display: flex; align-items: center; justify-content: center; } .ds-card__title { font-size: 1rem; font-weight: 600; color: #1F2937; margin: 0; }"
+    },
+    {
+      "name": "Risk Badge",
+      "kind": "chip",
+      "refersTo": "badge-risk",
+      "description": "ป้ายระดับความเสี่ยง AUDIT — สี wash ตามเกณฑ์คลินิก.",
+      "html": "<span class=\"ds-badge ds-badge--low\">ผู้ดื่มแบบเสี่ยงต่ำ</span> <span class=\"ds-badge ds-badge--critical\">ผู้ดื่มแบบติด</span>",
+      "css": ".ds-badge { display: inline-block; font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 9999px; } .ds-badge--low { color: #059669; background: #ECFDF5; } .ds-badge--critical { color: #DC2626; background: #FEF2F2; }"
+    },
+    {
+      "name": "Sidebar Nav Item",
+      "kind": "nav",
+      "refersTo": "nav-item",
+      "description": "เมนู sidebar บนพื้นเข้ม — รายการที่เลือกพื้นเขียว.",
+      "html": "<div style=\"background:#111827;padding:12px;border-radius:12px;width:240px\"><a class=\"ds-nav\">แบบสอบถาม</a><a class=\"ds-nav ds-nav--on\">ภาพรวม</a></div>",
+      "css": ".ds-nav { display: flex; align-items: center; padding: 10px 12px; border-radius: 8px; font-size: .875rem; color: rgba(255,255,255,.55); text-decoration: none; transition: background .15s, color .15s; } .ds-nav:hover { color: #fff; background: rgba(255,255,255,.04); } .ds-nav--on { background: #16A34A; color: #fff; font-weight: 600; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "สมุดบันทึกภาคสนาม (The Field Ledger)",
+    "overview": "ระบบนี้คือคลิปบอร์ดดิจิทัลที่ อสม. และเจ้าหน้าที่ถือลงพื้นที่ — เปิดบนมือถือกลางแดด กรอกขณะยืน ทุกหน้าจอจึงต้องเป็นระเบียบ ตัวเลขชัด กรอกไว และไว้ใจได้ ความน่าเชื่อถือมาจากความสะอาดและโครงสร้างที่อ่านง่าย ไม่ใช่การตกแต่ง พื้นหลังเทาอ่อนคั่นการ์ดขาวขอบคม เขียวสาธารณสุขปรากฏเฉพาะจุดที่มีความหมาย ตัวเลขใช้ monospace เพื่อเทียบค่าได้",
+    "keyCharacteristics": [
+      "แบนเป็นค่าเริ่มต้น — แยกชั้นด้วยเส้นขอบและพื้นเทา ไม่ใช่เงา",
+      "เขียวคือสำเนียง ไม่ใช่พื้น — accent ที่ใช้อย่างจำกัด",
+      "ตัวเลขเป็น monospace เสมอ",
+      "contrast สูง อ่านออกกลางแดด ปุ่มใหญ่แตะด้วยนิ้วโป้ง",
+      "คำอธิบาย (tooltip/modal) ช่วยคนไม่ถนัดเทคเข้าใจศัพท์ AUDIT/BMI"
+    ],
+    "rules": [
+      { "name": "The One-Green Rule", "body": "เขียวมีเสียงเดียว ใช้กับการกระทำหลัก/สถานะบวกเท่านั้น (≤10% ของจอ) ห้ามใช้เป็นพื้นกว้างหรือหลายเฉดในจอเดียว", "section": "colors" },
+      { "name": "The Clinical-Color Rule", "body": "สี risk-* สื่อระดับ ไม่ใช่ตกแต่ง — ใช้เฉพาะผลคะแนน/สถานะที่มีเกณฑ์จริง", "section": "colors" },
+      { "name": "The Numbers-Are-Mono Rule", "body": "ตัวเลขที่ต้องเทียบ/อ่านแม่นใช้ monospace เสมอ เพื่อให้หลักตรงกัน", "section": "typography" },
+      { "name": "The No-Faint-Body Rule", "body": "faint (#9CA3AF) ใช้ได้แค่ placeholder/hint ห้ามใช้กับ body text — ต้อง ink-soft ขึ้นไป (contrast ≥4.5:1)", "section": "typography" },
+      { "name": "The Flat-Ledger Rule", "body": "การ์ด/แถว/badge แบนหมด แยกด้วยเส้นขอบ+พื้นเทา เงาคือสัญญาณ overlay ลอยชั่วคราว ไม่ใช่เครื่องประดับการ์ด", "section": "elevation" }
+    ],
+    "dos": [
+      "Do ใช้ field-green กับการกระทำหลัก/สถานะบวกเท่านั้น (≤10% ของจอ)",
+      "Do แยกชั้นด้วยเส้นขอบ line + พื้น canvas การ์ดแบนไม่มีเงา",
+      "Do ใช้ ink-soft ขึ้นไปกับ body text; faint แค่ placeholder/hint (contrast ≥4.5:1 อ่านกลางแดด)",
+      "Do ใช้ monospace กับตัวเลขที่ต้องเทียบ (คะแนน/ปริมาณ/เกณฑ์)",
+      "Do ทำปุ่ม/target ใหญ่พอแตะด้วยนิ้วโป้ง (≥44px) ออกแบบมือถือก่อน",
+      "Do render tooltip/modal ผ่าน portal เพื่อหนี overflow-hidden ของการ์ด",
+      "Do ใส่ปุ่มอธิบาย (ℹ️/modal) ข้างศัพท์เทคนิค (AUDIT/BMI) เสมอ"
+    ],
+    "donts": [
+      "Don't ทำหน้าตาราชการเก่า แน่น อ่านยาก — ตารางทึบ ตัวอักษรเล็ก ยัดทุกอย่างหน้าเดียว",
+      "Don't ใช้สีฉูดฉาด/การ์ตูน — สีจัดหลายสี ไอคอนเยอะเกิน",
+      "Don't ใช้ glassmorphism, gradient text, เงาฟุ้ง หรือเอฟเฟกต์ตกแต่งที่รบกวนการอ่าน/กรอก",
+      "Don't หยิบเทมเพลต SaaS ฝรั่ง — hero-metric, identical card grid, eyebrow ตัวพิมพ์เล็กทุก section",
+      "Don't ใส่เงาใต้การ์ดที่นิ่ง — เงาสงวนไว้สำหรับ overlay เท่านั้น",
+      "Don't ทาเขียวเป็นพื้นกว้างหรือหลายเฉดในจอเดียว",
+      "Don't ใช้สี risk-* กับอะไรที่ไม่ใช่ผลคะแนน/สถานะที่มีเกณฑ์จริง"
+    ]
+  }
+}
