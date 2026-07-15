@@ -12,7 +12,9 @@ export default async function UsersPage() {
   const isSuperAdmin = session?.user.role === 'SUPERADMIN'
   const meId = session?.user.id
 
+  // ซ่อนบัญชี SUPERADMIN คนอื่นจากทุกคน — เห็นได้เฉพาะตัวเขาเอง
   const users = await prisma.user.findMany({
+    where: { OR: [{ role: { not: 'SUPERADMIN' } }, ...(meId ? [{ id: meId }] : [])] },
     orderBy: { createdAt: 'desc' },
     select: { id: true, firstName: true, lastName: true, email: true, role: true, createdAt: true },
   })

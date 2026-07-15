@@ -1,13 +1,14 @@
 'use client'
 
-import { useRouter, usePathname } from 'next/navigation'
+import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { useState, useEffect, useRef } from 'react'
 import { Search, X } from 'lucide-react'
 
-// ช่องค้นหารายการแบบสอบถาม — อัปเดต ?q= แบบ debounce (replace ไม่สแปม history)
+// ช่องค้นหารายการแบบสอบถาม — อัปเดต ?q= แบบ debounce (replace ไม่สแปม history, คงตัวกรองพื้นที่เดิมไว้)
 export default function SearchBox({ initial = '' }: { initial?: string }) {
   const router = useRouter()
   const pathname = usePathname()
+  const searchParams = useSearchParams()
   const [value, setValue] = useState(initial)
   const first = useRef(true)
 
@@ -15,9 +16,13 @@ export default function SearchBox({ initial = '' }: { initial?: string }) {
     if (first.current) { first.current = false; return }
     const t = setTimeout(() => {
       const q = value.trim()
-      router.replace(q ? `${pathname}?q=${encodeURIComponent(q)}` : pathname)
+      const params = new URLSearchParams(searchParams.toString())
+      q ? params.set('q', q) : params.delete('q')
+      const qs = params.toString()
+      router.replace(qs ? `${pathname}?${qs}` : pathname)
     }, 300)
     return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value, pathname, router])
 
   return (

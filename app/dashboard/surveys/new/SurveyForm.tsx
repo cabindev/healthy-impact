@@ -225,8 +225,8 @@ export default function SurveyForm({
           <Radio options={O.SITE_TYPES} value={f.siteType} onChange={(v) => set('siteType', (v || 'VILLAGE') as SurveyPayload['siteType'])} cols={2} />
         </Field>
         <div className="grid sm:grid-cols-2 gap-4">
-          <Field label="ชื่อผู้เก็บข้อมูล" required><Text value={f.collectorName ?? ''} onChange={(v) => set('collectorName', v)} /></Field>
-          <Field label="เบอร์โทรผู้เก็บข้อมูล"><Text value={f.collectorPhone ?? ''} onChange={(v) => set('collectorPhone', v)} /></Field>
+          <Field label="ชื่อผู้เก็บข้อมูล" required><Text value={f.collectorName ?? ''} onChange={(v) => set('collectorName', v)} placeholder="ชื่อ-นามสกุล ผู้สัมภาษณ์" /></Field>
+          <Field label="เบอร์โทรผู้เก็บข้อมูล"><Text value={f.collectorPhone ?? ''} onChange={(v) => set('collectorPhone', v)} placeholder="เช่น 081-234-5678" /></Field>
         </div>
         <p className="text-xs text-gray-400">การตรวจสอบข้อมูลทำผ่านปุ่ม “ยืนยันการตรวจสอบ” ที่หน้าแบบสอบถามรายตัวหลังบันทึก</p>
       </Section>
@@ -234,8 +234,8 @@ export default function SurveyForm({
       {/* ส่วนที่ 1 */}
       <Section no="1" title="ข้อมูลทั่วไป">
         <div className="grid sm:grid-cols-2 gap-4">
-          <Field label="1.1 หมู่ที่"><Text value={f.villageNo ?? ''} onChange={(v) => set('villageNo', v)} /></Field>
-          <Field label="1.2 ชื่อหมู่บ้าน"><Text value={f.villageName ?? ''} onChange={(v) => set('villageName', v)} /></Field>
+          <Field label="1.1 หมู่ที่"><Text value={f.villageNo ?? ''} onChange={(v) => set('villageNo', v)} placeholder="เช่น 5" /></Field>
+          <Field label="1.2 ชื่อหมู่บ้าน"><Text value={f.villageName ?? ''} onChange={(v) => set('villageName', v)} placeholder="เช่น บ้านหนองบัว" /></Field>
         </div>
         <Field label="1.3–1.5 ตำบล / อำเภอ / จังหวัด" hint="(เลือกตำบล แล้วอำเภอ-จังหวัดเติมอัตโนมัติ)">
           <TambonPicker
@@ -265,11 +265,11 @@ export default function SurveyForm({
         {!ineligible && (
         <>
         <div className="grid sm:grid-cols-2 gap-4">
-          <Field label="1.8 เลขบัตรประชาชน" hint="(ไม่บังคับ)"><Text value={f.nationalId ?? ''} onChange={(v) => set('nationalId', v)} /></Field>
-          <Field label="1.9 คำนำหน้า"><Text value={f.prefix ?? ''} onChange={(v) => set('prefix', v)} /></Field>
-          <Field label="ชื่อ"><Text value={f.firstName ?? ''} onChange={(v) => set('firstName', v)} /></Field>
-          <Field label="นามสกุล"><Text value={f.lastName ?? ''} onChange={(v) => set('lastName', v)} /></Field>
-          <Field label="เบอร์โทรศัพท์"><Text value={f.phone ?? ''} onChange={(v) => set('phone', v)} /></Field>
+          <Field label="1.8 เลขบัตรประชาชน" hint="(ไม่บังคับ)"><Text value={f.nationalId ?? ''} onChange={(v) => set('nationalId', v)} placeholder="เลข 13 หลัก" /></Field>
+          <Field label="1.9 คำนำหน้า"><Text value={f.prefix ?? ''} onChange={(v) => set('prefix', v)} placeholder="เช่น นาย / นาง / นางสาว" /></Field>
+          <Field label="ชื่อ"><Text value={f.firstName ?? ''} onChange={(v) => set('firstName', v)} placeholder="ชื่อจริง" /></Field>
+          <Field label="นามสกุล"><Text value={f.lastName ?? ''} onChange={(v) => set('lastName', v)} placeholder="นามสกุล" /></Field>
+          <Field label="เบอร์โทรศัพท์"><Text value={f.phone ?? ''} onChange={(v) => set('phone', v)} placeholder="เช่น 081-234-5678" /></Field>
         </div>
         <Field label="1.10 เพศ">
           <Radio options={O.GENDERS} value={f.gender ?? ''} onChange={(v) => set('gender', v)} cols={2} />

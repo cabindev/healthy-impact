@@ -2,10 +2,12 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
-import { CheckCircle2, FileSpreadsheet, Eye, SquarePen } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { CheckCircle2, FileSpreadsheet, Eye, SquarePen, Trash2 } from 'lucide-react'
 import { RISK_COLORS, type RiskLevel } from '@/app/lib/audit'
 import AuditTip from '@/app/components/AuditTip'
 import PrintSlipButton from './PrintSlipButton'
+import { deleteSurvey } from '@/app/actions/survey'
 
 export type SurveyRow = {
   id: number
@@ -19,10 +21,17 @@ export type SurveyRow = {
   verified: boolean
 }
 
-export default function SurveyTable({ rows, q }: { rows: SurveyRow[]; q: string }) {
+export default function SurveyTable({ rows, q, filterQuery = '' }: { rows: SurveyRow[]; q: string; filterQuery?: string }) {
+  const router = useRouter()
   const [selected, setSelected] = useState<Set<number>>(new Set())
+  const [deletingId, setDeletingId] = useState<number | null>(null)
   const n = selected.size
   const allSelected = rows.length > 0 && n === rows.length
+  // มีติ๊กเลือกแถวอยู่ → ปุ่ม export บนขวาต้อง export เฉพาะที่เลือก ไม่ใช่ export ตามตัวกรองทั้งก้อน
+  const exportTopHref = n > 0
+    ? `/api/report/export?ids=${[...selected].join(',')}`
+    : filterQuery ? `/api/report/export?${filterQuery}` : '/api/report/export'
+  const exportTopLabel = n > 0 ? `Export ที่เลือก (${n})` : filterQuery ? 'Export ที่กรอง' : 'Export ทั้งหมด'
 
   const toggle = (id: number) =>
     setSelected((prev) => {
@@ -34,14 +43,31 @@ export default function SurveyTable({ rows, q }: { rows: SurveyRow[]; q: string 
   const exportSelected = () => {
     if (n > 0) window.location.href = `/api/report/export?ids=${[...selected].join(',')}`
   }
+  const remove = async (id: number, no: string) => {
+    if (!confirm(`ยืนยันการลบแบบสอบถาม ${no}? การลบไม่สามารถย้อนกลับได้`)) return
+    setDeletingId(id)
+    try {
+      await deleteSurvey(id)
+      setSelected((prev) => {
+        const next = new Set(prev)
+        next.delete(id)
+        return next
+      })
+      router.refresh()
+    } catch {
+      alert('ลบไม่สำเร็จ โปรดลองอีกครั้ง')
+    } finally {
+      setDeletingId(null)
+    }
+  }
 
   return (
     <>
-      {/* toolbar — export ทั้งหมด (ผูกกับตารางที่ค้นได้) */}
+      {/* toolbar — export ที่เลือกถ้ามีติ๊กไว้ ไม่งั้น export ตามตัวกรอง/คำค้นปัจจุบัน */}
       <div className="flex justify-end">
-        <a href="/api/report/export"
+        <a href={exportTopHref}
           className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-          <FileSpreadsheet className="w-4 h-4" /> Export ทั้งหมด
+          <FileSpreadsheet className="w-4 h-4" /> {exportTopLabel}
         </a>
       </div>
 
@@ -110,6 +136,11 @@ export default function SurveyTable({ rows, q }: { rows: SurveyRow[]; q: string 
                         </Link>
                       )}
                       <PrintSlipButton id={r.id} />
+                      <button type="button" onClick={() => remove(r.id, r.no)} disabled={deletingId === r.id}
+                        aria-label="ลบ" title="ลบ"
+                        className={`inline-flex items-center justify-center text-gray-400 hover:text-red-600 transition-colors ${deletingId === r.id ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
                   </td>
                 </tr>

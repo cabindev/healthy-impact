@@ -2,36 +2,40 @@ import Link from 'next/link'
 import { prisma } from '@/app/lib/prisma'
 import { Plus } from 'lucide-react'
 import SearchBox from './SearchBox'
+import AreaFilter, { type GeoCombo } from './AreaFilter'
 import SurveyTable, { type SurveyRow } from './SurveyTable'
-import type { Prisma } from '@prisma/client'
+import { buildSurveyWhere } from '@/app/lib/survey-filters'
 
 export const dynamic = 'force-dynamic'
 
 const SITE_LABEL: Record<string, string> = { VILLAGE: 'หมู่บ้าน', WORKPLACE: 'สถานประกอบการ', SCHOOL: 'สถานศึกษา' }
 
-export default async function SurveysPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
-  const q = (await searchParams).q?.trim() ?? ''
-  const where: Prisma.SurveyWhereInput = q
-    ? {
-        OR: [
-          { questionnaireNo: { contains: q } },
-          { prefix: { contains: q } },
-          { firstName: { contains: q } },
-          { lastName: { contains: q } },
-          { tambon: { contains: q } },
-          { amphoe: { contains: q } },
-          { province: { contains: q } },
-          { collectorName: { contains: q } },
-        ],
-      }
-    : {}
+type SurveysSearchParams = { q?: string; zone?: string; province?: string; amphoe?: string; tambon?: string; village?: string }
 
-  const surveys = await prisma.survey.findMany({
-    where,
-    orderBy: { createdAt: 'desc' },
-    include: { alcohol: { select: { auditScore: true, riskLevel: true } } },
-    take: 100,
-  })
+export default async function SurveysPage({ searchParams }: { searchParams: Promise<SurveysSearchParams> }) {
+  const sp = await searchParams
+  const q = sp.q?.trim() ?? ''
+  const zone = sp.zone?.trim() ?? ''
+  const province = sp.province?.trim() ?? ''
+  const amphoe = sp.amphoe?.trim() ?? ''
+  const tambon = sp.tambon?.trim() ?? ''
+  const village = sp.village?.trim() ?? ''
+
+  const where = buildSurveyWhere({ q, zone, province, amphoe, tambon, village })
+
+  const [surveys, geoCombos] = await Promise.all([
+    prisma.survey.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      include: { alcohol: { select: { auditScore: true, riskLevel: true } } },
+      take: 100,
+    }),
+    prisma.survey.findMany({
+      select: { province: true, amphoe: true, tambon: true, villageName: true },
+      distinct: ['province', 'amphoe', 'tambon', 'villageName'],
+    }),
+  ])
+  const combos: GeoCombo[] = geoCombos
 
   const rows: SurveyRow[] = surveys.map((s) => ({
     id: s.id,
@@ -45,13 +49,23 @@ export default async function SurveysPage({ searchParams }: { searchParams: Prom
     verified: !!s.verifiedAt,
   }))
 
+  const filtered = !!(q || zone || province || amphoe || tambon || village)
+  const filterQuery = new URLSearchParams({
+    ...(q ? { q } : {}),
+    ...(zone ? { zone } : {}),
+    ...(province ? { province } : {}),
+    ...(amphoe ? { amphoe } : {}),
+    ...(tambon ? { tambon } : {}),
+    ...(village ? { village } : {}),
+  }).toString()
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3 print:hidden">
         <div>
           <h1 className="text-xl font-semibold text-gray-800">แบบสอบถาม</h1>
           <p className="text-sm text-gray-400 mt-0.5">
-            {q ? `พบ ${rows.length.toLocaleString()} รายการ จากคำค้น “${q}”` : `ทั้งหมด ${rows.length.toLocaleString()} รายการ`}
+            {filtered ? `พบ ${rows.length.toLocaleString()} รายการ` : `ทั้งหมด ${rows.length.toLocaleString()} รายการ`}
             {rows.length === 100 && <span className="text-gray-300"> · แสดง 100 รายการแรก</span>}
           </p>
         </div>
@@ -61,10 +75,11 @@ export default async function SurveysPage({ searchParams }: { searchParams: Prom
         </Link>
       </div>
 
-      <div className="print:hidden">
+      <div className="print:hidden space-y-2">
         <SearchBox initial={q} />
+        <AreaFilter combos={combos} />
       </div>
-      <SurveyTable rows={rows} q={q} />
+      <SurveyTable rows={rows} q={q} filterQuery={filterQuery} />
     </div>
   )
 }
