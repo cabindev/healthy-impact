@@ -10,7 +10,16 @@ export const dynamic = 'force-dynamic'
 export default async function UsersPage() {
   const session = await getServerSession(authOptions)
   const isSuperAdmin = session?.user.role === 'SUPERADMIN'
+  const isAdmin = session?.user.role === 'ADMIN'
   const meId = session?.user.id
+
+  // SUPERADMIN แก้ role ใครก็ได้ (เว้นตนเอง) · ADMIN แก้ได้เฉพาะคนที่ยังเป็น MEMBER
+  const canEditRole = (u: { id: number; role: RoleValue }) => {
+    if (u.id === meId) return false
+    if (isSuperAdmin) return true
+    if (isAdmin) return u.role === 'MEMBER'
+    return false
+  }
 
   // ซ่อนบัญชี SUPERADMIN คนอื่นจากทุกคน — เห็นได้เฉพาะตัวเขาเอง
   const users = await prisma.user.findMany({
@@ -29,7 +38,9 @@ export default async function UsersPage() {
         <div>
           <h1 className="text-xl font-semibold text-gray-800">ผู้ใช้งาน</h1>
           <p className="text-sm text-gray-400 mt-0.5">
-            {isSuperAdmin ? 'เพิ่ม/แก้ไข/ลบ และเปลี่ยนสิทธิ์ผู้ใช้งานได้' : 'จัดการสิทธิ์ผู้ใช้งานระบบ (เฉพาะ SUPERADMIN เท่านั้นที่แก้ไขได้)'}
+            {isSuperAdmin
+              ? 'เพิ่ม/แก้ไข/ลบ และเปลี่ยนสิทธิ์ผู้ใช้งานได้'
+              : 'เปลี่ยนสิทธิ์ผู้ใช้งานระดับ MEMBER ได้ (เพิ่ม/แก้ไข/ลบผู้ใช้ และตั้งเป็น SUPERADMIN เฉพาะ SUPERADMIN เท่านั้น)'}
           </p>
         </div>
         {isSuperAdmin && <AddUserButton />}
@@ -53,7 +64,12 @@ export default async function UsersPage() {
                 <td className="px-4 py-3 text-gray-700">{u.firstName} {u.lastName}{u.id === meId && <span className="text-gray-400 text-xs ml-1">(คุณ)</span>}</td>
                 <td className="px-4 py-3 text-gray-500">{u.email}</td>
                 <td className="px-4 py-3">
-                  <RoleSelect userId={u.id} role={u.role as RoleValue} disabled={!isSuperAdmin || u.id === meId} />
+                  <RoleSelect
+                    userId={u.id}
+                    role={u.role as RoleValue}
+                    disabled={!canEditRole({ id: u.id, role: u.role as RoleValue })}
+                    roles={isSuperAdmin ? undefined : ['MEMBER', 'ADMIN']}
+                  />
                 </td>
                 {isSuperAdmin && (
                   <td className="px-4 py-3">

@@ -3,9 +3,9 @@
 import { useState, useTransition } from 'react'
 import { updateUserRole, type RoleValue } from '@/app/actions/user'
 
-const ROLES: RoleValue[] = ['MEMBER', 'ADMIN', 'SUPERADMIN']
+const ALL_ROLES: RoleValue[] = ['MEMBER', 'ADMIN', 'SUPERADMIN']
 
-export default function RoleSelect({ userId, role, disabled }: { userId: number; role: RoleValue; disabled?: boolean }) {
+export default function RoleSelect({ userId, role, disabled, roles = ALL_ROLES }: { userId: number; role: RoleValue; disabled?: boolean; roles?: RoleValue[] }) {
   const [value, setValue] = useState<RoleValue>(role)
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState(false)
@@ -36,7 +36,7 @@ export default function RoleSelect({ userId, role, disabled }: { userId: number;
       className={`text-xs px-2 py-1 rounded-lg border bg-white font-medium focus:outline-none focus:border-green-500 ${
         error ? 'border-red-300 text-red-600' : 'border-gray-200 text-gray-700'
       } ${pending ? 'opacity-50' : ''}`}>
-      {ROLES.map((r) => (
+      {roles.map((r) => (
         <option key={r} value={r}>{r}</option>
       ))}
     </select>

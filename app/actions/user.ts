@@ -1,7 +1,7 @@
 'use server'
 
 import { prisma } from '@/app/lib/prisma'
-import { requireSuperAdmin } from '@/app/lib/auth'
+import { requireAdmin, requireSuperAdmin } from '@/app/lib/auth'
 import { revalidatePath } from 'next/cache'
 import bcrypt from 'bcrypt'
 
@@ -16,10 +16,17 @@ export interface UserInput {
   role: RoleValue
 }
 
-// เปลี่ยนสิทธิ์ผู้ใช้ — เฉพาะ SUPERADMIN และห้ามแก้สิทธิ์ของตนเอง
+// เปลี่ยนสิทธิ์ผู้ใช้ — SUPERADMIN แก้ได้ทุกคน (ยกเว้นตนเอง)
+// ADMIN แก้ได้เฉพาะผู้ใช้ที่ปัจจุบันเป็น MEMBER และตั้งได้แค่ MEMBER/ADMIN เท่านั้น (กัน privilege escalation ไป SUPERADMIN)
 export async function updateUserRole(userId: number, role: RoleValue) {
-  const session = await requireSuperAdmin()
+  const session = await requireAdmin()
   if (session.user.id === userId) throw new Error('ไม่สามารถเปลี่ยนสิทธิ์ของตนเองได้')
+
+  if (session.user.role !== 'SUPERADMIN') {
+    if (role === 'SUPERADMIN') throw new Error('ไม่มีสิทธิ์ตั้งเป็น SUPERADMIN')
+    const target = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } })
+    if (!target || target.role !== 'MEMBER') throw new Error('ไม่มีสิทธิ์แก้ไขผู้ใช้นี้')
+  }
 
   await prisma.user.update({ where: { id: userId }, data: { role } })
   revalidatePath('/dashboard/users')
