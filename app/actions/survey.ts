@@ -1,11 +1,13 @@
 'use server'
 
 import { prisma } from '@/app/lib/prisma'
-import { requireAdmin } from '@/app/lib/auth'
+import { requireAdmin, canManageSurvey } from '@/app/lib/auth'
 import { evaluateAudit } from '@/app/lib/audit'
 import { labeledSurvey, SURVEY_INCLUDE } from '@/app/lib/survey-export'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
+
+export type DeleteResult = { ok: true } | { ok: false; error: string }
 
 // ข้อมูลเต็มของ 1 แบบสอบถาม (label ไทย:ค่า) สำหรับสลิปพิมพ์รายคน
 export async function getSurveySlip(id: number) {
@@ -201,11 +203,12 @@ function buildAlcohol(data: SurveyPayload) {
 }
 
 export async function createSurvey(data: SurveyPayload) {
-  await requireAdmin()
+  const session = await requireAdmin()
 
   const created = await prisma.survey.create({
     data: {
       ...buildScalars(data),
+      creatorId: session.user.id,
       tobacco: { create: buildTobacco(data) },
       alcohol: { create: buildAlcohol(data) },
     },
@@ -219,6 +222,7 @@ export async function createSurvey(data: SurveyPayload) {
 
   revalidatePath('/dashboard/surveys')
   revalidatePath('/dashboard')
+  revalidatePath('/dashboard/profile')
   redirect('/dashboard/surveys')
 }
 
@@ -234,11 +238,12 @@ export async function createIneligible(data: {
   collectorPhone?: string
   reason: string
 }) {
-  await requireAdmin()
+  const session = await requireAdmin()
 
   const created = await prisma.survey.create({
     data: {
       siteType: data.siteType,
+      creatorId: session.user.id,
       villageNo: str(data.villageNo),
       villageName: str(data.villageName),
       province: str(data.province),
@@ -259,6 +264,7 @@ export async function createIneligible(data: {
 
   revalidatePath('/dashboard/surveys')
   revalidatePath('/dashboard')
+  revalidatePath('/dashboard/profile')
   redirect('/dashboard/surveys')
 }
 
@@ -309,9 +315,19 @@ export async function unverifySurvey(id: number) {
   revalidatePath(`/dashboard/surveys/${id}`)
 }
 
-export async function deleteSurvey(id: number) {
-  await requireAdmin()
+// ลบแบบสอบถาม — ADMIN ลบได้เฉพาะใบที่ตนเองบันทึก, SUPERADMIN ลบได้ทุกใบ
+export async function deleteSurvey(id: number): Promise<DeleteResult> {
+  const session = await requireAdmin()
+
+  const survey = await prisma.survey.findUnique({ where: { id }, select: { creatorId: true } })
+  if (!survey) return { ok: false, error: 'ไม่พบแบบสอบถามนี้ (อาจถูกลบไปแล้ว)' }
+  if (!canManageSurvey(session.user, survey.creatorId)) {
+    return { ok: false, error: 'ลบได้เฉพาะแบบสอบถามที่คุณเป็นผู้บันทึกเท่านั้น' }
+  }
+
   await prisma.survey.delete({ where: { id } })
   revalidatePath('/dashboard/surveys')
   revalidatePath('/dashboard')
+  revalidatePath('/dashboard/profile')
+  return { ok: true }
 }

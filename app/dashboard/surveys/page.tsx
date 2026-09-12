@@ -1,4 +1,7 @@
 import Link from 'next/link'
+import { getServerSession } from 'next-auth'
+import authOptions from '@/app/lib/configs/auth/authOptions'
+import { canManageSurvey } from '@/app/lib/auth'
 import { prisma } from '@/app/lib/prisma'
 import { Plus } from 'lucide-react'
 import SearchBox from './SearchBox'
@@ -22,6 +25,7 @@ export default async function SurveysPage({ searchParams }: { searchParams: Prom
   const village = sp.village?.trim() ?? ''
 
   const where = buildSurveyWhere({ q, zone, province, amphoe, tambon, village })
+  const session = await getServerSession(authOptions)
 
   const [surveys, geoCombos] = await Promise.all([
     prisma.survey.findMany({
@@ -47,6 +51,7 @@ export default async function SurveysPage({ searchParams }: { searchParams: Prom
     risk: s.alcohol?.riskLevel ?? null,
     eligible: s.eligible,
     verified: !!s.verifiedAt,
+    canDelete: canManageSurvey(session?.user, s.creatorId),
   }))
 
   const filtered = !!(q || zone || province || amphoe || tambon || village)

@@ -92,6 +92,12 @@ User, Survey, SurveyTobacco, SurveyAlcohol
 - **ปุ่มบันทึก = วงกลม** "บันทึก" (w-16 h-16) ในแถบ sticky ล่าง — แดงเมื่อไม่เข้าเกณฑ์, มี aria-label เต็ม
 - **PDPA ConsentModal** (`surveys/new/ConsentModal.tsx`, อ้างอิง cm-local): gate แจ้งสิทธิ์ PDPA + ติ๊กยืนยัน 2 ข้อ (วัตถุประสงค์ + ข้อมูลสุขภาพอ่อนไหว) ก่อนกรอก (เฉพาะเพิ่มใหม่ ไม่ถามตอน edit) → ยินยอมเซ็ต Q1.7=ใช่ / ไม่ยินยอมเซ็ต=ไม่ใช่ (เข้า flow ไม่เข้าเกณฑ์). ใช้ฟิลด์ `consentGiven`/`consentAt` เดิม ไม่ต้อง migrate
 
+## เสร็จเพิ่ม (สิทธิ์รายใบ + โปรไฟล์)
+- **เจ้าของแบบสอบถาม**: `createSurvey`/`createIneligible` stamp `creatorId = session.user.id` (ฟิลด์มีใน schema อยู่แล้ว ไม่ต้อง migrate)
+- **ลบได้เฉพาะของตัวเอง**: helper `canManageSurvey(user, creatorId)` ใน `app/lib/auth.ts` — SUPERADMIN ลบได้ทุกใบ, ADMIN ลบได้เฉพาะใบที่ตัวเองบันทึก (ใบที่ `creatorId = null` = SUPERADMIN เท่านั้น). `deleteSurvey()` คืน `DeleteResult` (`{ok}` / `{ok:false,error}`) แทนการ throw → UI แสดงข้อความจริง; ซ่อนปุ่มลบใน `SurveyTable` (prop `canDelete` ต่อแถว) และหน้ารายตัว (`SurveyActions` prop `deletable`)
+- **หน้าโปรไฟล์** `app/dashboard/profile/page.tsx` — การ์ดบัญชี (avatar/สิทธิ์/วันเข้าร่วม/ขอบเขตการลบ), stat 6 ใบ (บันทึกทั้งหมด/เข้าเกณฑ์/ตรวจสอบแล้ว/30 วัน/พื้นที่/ล่าสุด), BarList แยกตามสถานที่·ความเสี่ยง·พื้นที่, รายการ 10 ใบล่าสุดกดเข้าตรวจสอบได้ (query `where: { creatorId: meId }`); เข้าจากบล็อกชื่อผู้ใช้ท้าย Sidebar
+- **หมายเหตุ:** `updateSurvey`/`verifySurvey` ยังเปิดให้ ADMIN ทุกคน (ตั้งใจ — ให้ตรวจงานข้ามกันได้)
+
 ## 📊 Dashboard + Seed
 - **Dashboard กราฟ** (`app/dashboard/page.tsx` aggregate + `components/DashboardCharts.tsx`): ใช้ **shadcn charts** (Recharts v2 + `components/ui/chart.tsx` + theme tokens ใน globals.css + `cn` ที่ `app/lib/utils.ts`). KPI 6 ใบ + area รายวัน, donut ความเสี่ยง AUDIT/เพศ (center total), bar บุหรี่/อายุ/BMI/จังหวัด. นับเฉพาะ eligible
   - **หมายเหตุ:** เคยลอง ApexCharts แต่ `react-apexcharts` พังกับ React 19 (`reading 'node'`) → ย้ายมา shadcn/Recharts v2 (อย่าใช้ react-apexcharts)

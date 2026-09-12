@@ -91,6 +91,13 @@ async function main() {
   const TOTAL = 50
   const INELIGIBLE = 6
 
+  // กระจายผู้บันทึกไปตามบัญชี ADMIN/SUPERADMIN ที่มีจริง — ให้หน้าโปรไฟล์และสิทธิ์ลบมีข้อมูลทดสอบ
+  const staff = await prisma.user.findMany({
+    where: { role: { in: ['ADMIN', 'SUPERADMIN'] } },
+    select: { id: true },
+  })
+  const creatorId = () => (staff.length ? pick(staff).id : null)
+
   for (let i = 0; i < TOTAL; i++) {
     const daysAgo = rnd(60)
     const createdAt = new Date(Date.now() - daysAgo * 86400000 - rnd(86400000))
@@ -107,6 +114,7 @@ async function main() {
         data: {
           siteType: pick(SITES), ...geo, villageNo: String(range(1, 12)),
           collectorName: pick([...FIRST_M, ...FIRST_F]) + ' ' + pick(LAST),
+          creatorId: creatorId(),
           consentGiven: false, eligible: false, ineligibleReason: reason, createdAt,
         },
       })
@@ -130,6 +138,7 @@ async function main() {
         siteType: pick(SITES), ...geo, villageNo: String(range(1, 12)), villageName: 'บ้าน' + pick(['หนองบัว', 'ทุ่งกว้าง', 'ดอนแก้ว', 'ป่าสัก']),
         residence6Months: true, consentGiven: true, consentAt: createdAt,
         collectorName: pick([...FIRST_M, ...FIRST_F]) + ' ' + pick(LAST),
+        creatorId: creatorId(),
         prefix: isMale ? 'นาย' : pick(['นาง', 'นางสาว']),
         firstName: isMale ? pick(FIRST_M) : pick(FIRST_F), lastName: pick(LAST),
         gender: isMale ? 'ชาย' : 'หญิง',

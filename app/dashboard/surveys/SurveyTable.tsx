@@ -19,6 +19,7 @@ export type SurveyRow = {
   risk: string | null
   eligible: boolean
   verified: boolean
+  canDelete: boolean
 }
 
 export default function SurveyTable({ rows, q, filterQuery = '' }: { rows: SurveyRow[]; q: string; filterQuery?: string }) {
@@ -47,7 +48,11 @@ export default function SurveyTable({ rows, q, filterQuery = '' }: { rows: Surve
     if (!confirm(`ยืนยันการลบแบบสอบถาม ${no}? การลบไม่สามารถย้อนกลับได้`)) return
     setDeletingId(id)
     try {
-      await deleteSurvey(id)
+      const res = await deleteSurvey(id)
+      if (!res.ok) {
+        alert(res.error)
+        return
+      }
       setSelected((prev) => {
         const next = new Set(prev)
         next.delete(id)
@@ -136,11 +141,13 @@ export default function SurveyTable({ rows, q, filterQuery = '' }: { rows: Surve
                         </Link>
                       )}
                       <PrintSlipButton id={r.id} />
-                      <button type="button" onClick={() => remove(r.id, r.no)} disabled={deletingId === r.id}
-                        aria-label="ลบ" title="ลบ"
-                        className={`inline-flex items-center justify-center text-gray-400 hover:text-red-600 transition-colors ${deletingId === r.id ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      {r.canDelete && (
+                        <button type="button" onClick={() => remove(r.id, r.no)} disabled={deletingId === r.id}
+                          aria-label="ลบ" title="ลบ"
+                          className={`inline-flex items-center justify-center text-gray-400 hover:text-red-600 transition-colors ${deletingId === r.id ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

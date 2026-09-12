@@ -1,5 +1,8 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { getServerSession } from 'next-auth'
+import authOptions from '@/app/lib/configs/auth/authOptions'
+import { canManageSurvey } from '@/app/lib/auth'
 import { prisma } from '@/app/lib/prisma'
 import { RISK_COLORS, RISK_ADVICE, type RiskLevel } from '@/app/lib/audit'
 import * as O from '@/app/lib/survey-options'
@@ -57,6 +60,9 @@ export default async function SurveyDetailPage({ params }: { params: Promise<{ i
   })
   if (!s) notFound()
 
+  const session = await getServerSession(authOptions)
+  const canDelete = canManageSurvey(session?.user, s.creatorId)
+
   const t = s.tobacco
   const a = s.alcohol
   const risk = a?.riskLevel as RiskLevel | undefined
@@ -85,7 +91,7 @@ export default async function SurveyDetailPage({ params }: { params: Promise<{ i
           <h1 className="text-xl font-semibold text-gray-800">{s.questionnaireNo || `แบบสอบถาม #${s.id}`}</h1>
           <p className="text-sm text-gray-400 mt-0.5">{name} · {SITE_LABEL[s.siteType]}</p>
         </div>
-        <SurveyActions id={s.id} editable={s.eligible} />
+        <SurveyActions id={s.id} editable={s.eligible} deletable={canDelete} />
       </div>
 
       <Section no="◆" title="ข้อมูลการเก็บแบบสอบถาม">

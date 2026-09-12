@@ -81,19 +81,22 @@ export default function Sidebar({ user }: SidebarProps) {
         })}
       </nav>
 
-      {/* User + signout */}
+      {/* User + signout — กดที่ชื่อเพื่อเปิดโปรไฟล์ */}
       <div className="border-t border-white/[0.06] p-4">
-        <div className={`flex items-center gap-3 ${sidebarCollapsed ? 'justify-center' : ''}`}>
+        <Link href="/dashboard/profile" onClick={handleNavClick} title={sidebarCollapsed ? 'โปรไฟล์ของฉัน' : ''}
+          className={`flex items-center gap-3 rounded-lg p-1.5 -m-1.5 transition-colors hover:bg-white/[0.06]
+            ${pathname === '/dashboard/profile' ? 'bg-white/[0.06]' : ''}
+            ${sidebarCollapsed ? 'justify-center' : ''}`}>
           <div className="w-8 h-8 rounded-full bg-green-600 flex items-center justify-center shrink-0">
             <span className="text-xs font-bold text-white">{user?.firstName?.charAt(0)}{user?.lastName?.charAt(0)}</span>
           </div>
           {!sidebarCollapsed && (
             <div className="min-w-0">
               <p className="text-sm font-medium text-white truncate">{user?.firstName} {user?.lastName}</p>
-              <p className="text-xs text-gray-400 truncate">{user?.role}</p>
+              <p className="text-xs text-gray-400 truncate">โปรไฟล์ของฉัน · {user?.role}</p>
             </div>
           )}
-        </div>
+        </Link>
         <button onClick={() => signOut({ callbackUrl: '/' })} title={sidebarCollapsed ? 'ออกจากระบบ' : ''}
           className={`mt-3 flex items-center w-full px-3 py-2 text-sm text-gray-400 hover:text-white hover:bg-white/[0.06] rounded-lg transition-colors ${sidebarCollapsed ? 'justify-center' : ''}`}>
           <LogOut className="w-5 h-5 shrink-0" />
