@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic'
 
 const SITE_LABEL: Record<string, string> = { VILLAGE: 'หมู่บ้าน', WORKPLACE: 'สถานประกอบการ', SCHOOL: 'สถานศึกษา' }
 
-type SurveysSearchParams = { q?: string; zone?: string; province?: string; amphoe?: string; tambon?: string; village?: string }
+type SurveysSearchParams = { q?: string; zone?: string; province?: string; amphoe?: string; tambon?: string; village?: string; noArea?: string }
 
 export default async function SurveysPage({ searchParams }: { searchParams: Promise<SurveysSearchParams> }) {
   const sp = await searchParams
@@ -23,8 +23,9 @@ export default async function SurveysPage({ searchParams }: { searchParams: Prom
   const amphoe = sp.amphoe?.trim() ?? ''
   const tambon = sp.tambon?.trim() ?? ''
   const village = sp.village?.trim() ?? ''
+  const noArea = sp.noArea === '1'
 
-  const where = buildSurveyWhere({ q, zone, province, amphoe, tambon, village })
+  const where = buildSurveyWhere({ q, zone, province, amphoe, tambon, village, noArea })
   const session = await getServerSession(authOptions)
 
   const [surveys, geoCombos] = await Promise.all([
@@ -39,6 +40,9 @@ export default async function SurveysPage({ searchParams }: { searchParams: Prom
       distinct: ['province', 'amphoe', 'tambon', 'villageName'],
     }),
   ])
+
+  // นับรายการที่ยังไม่ระบุพื้นที่ทั้งระบบ — ข้อมูลเก่าก่อนบังคับกรอกพื้นที่ ต้องไล่เติมย้อนหลัง
+  const noAreaCount = await prisma.survey.count({ where: { OR: [{ province: null }, { province: '' }] } })
   const combos: GeoCombo[] = geoCombos
 
   const rows: SurveyRow[] = surveys.map((s) => ({
@@ -54,7 +58,7 @@ export default async function SurveysPage({ searchParams }: { searchParams: Prom
     canDelete: canManageSurvey(session?.user, s.creatorId),
   }))
 
-  const filtered = !!(q || zone || province || amphoe || tambon || village)
+  const filtered = !!(q || zone || province || amphoe || tambon || village || noArea)
   const filterQuery = new URLSearchParams({
     ...(q ? { q } : {}),
     ...(zone ? { zone } : {}),
@@ -62,6 +66,7 @@ export default async function SurveysPage({ searchParams }: { searchParams: Prom
     ...(amphoe ? { amphoe } : {}),
     ...(tambon ? { tambon } : {}),
     ...(village ? { village } : {}),
+    ...(noArea ? { noArea: '1' } : {}),
   }).toString()
 
   return (
@@ -79,6 +84,18 @@ export default async function SurveysPage({ searchParams }: { searchParams: Prom
           <Plus className="w-4 h-4" /> เพิ่มแบบสอบถาม
         </Link>
       </div>
+
+      {noAreaCount > 0 && !noArea && (
+        <div className="print:hidden flex flex-wrap items-center justify-between gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+          <p className="text-sm text-amber-800">
+            มี <b className="tabular-nums">{noAreaCount.toLocaleString()}</b> รายการที่ยังไม่ระบุพื้นที่ — ไม่ถูกนับในแผนที่และตัวกรองพื้นที่
+          </p>
+          <Link href="/dashboard/surveys?noArea=1"
+            className="text-sm font-semibold text-amber-800 hover:text-amber-900 underline underline-offset-2 shrink-0">
+            ไปแก้ไข
+          </Link>
+        </div>
+      )}
 
       <div className="print:hidden space-y-2">
         <SearchBox initial={q} />

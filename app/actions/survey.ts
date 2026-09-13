@@ -315,6 +315,32 @@ export async function unverifySurvey(id: number) {
   revalidatePath(`/dashboard/surveys/${id}`)
 }
 
+// เติมพื้นที่ให้หลายรายการพร้อมกัน — ใช้ไล่แก้ข้อมูลเก่าที่ province เป็น null
+export async function setSurveyArea(
+  ids: number[],
+  area: { tambon: string; amphoe: string; province: string },
+): Promise<{ ok: true; updated: number } | { ok: false; error: string }> {
+  await requireAdmin()
+
+  const clean = ids.filter((id) => Number.isInteger(id))
+  if (clean.length === 0) return { ok: false, error: 'ยังไม่ได้เลือกรายการ' }
+  if (!area.tambon?.trim() || !area.province?.trim()) return { ok: false, error: 'กรุณาเลือกตำบล' }
+
+  const { count } = await prisma.survey.updateMany({
+    where: { id: { in: clean } },
+    data: {
+      tambon: area.tambon.trim(),
+      amphoe: area.amphoe.trim() || null,
+      province: area.province.trim(),
+    },
+  })
+
+  revalidatePath('/dashboard/surveys')
+  revalidatePath('/dashboard')
+  revalidatePath('/dashboard/map')
+  return { ok: true, updated: count }
+}
+
 // ลบแบบสอบถาม — ADMIN ลบได้เฉพาะใบที่ตนเองบันทึก, SUPERADMIN ลบได้ทุกใบ
 export async function deleteSurvey(id: number): Promise<DeleteResult> {
   const session = await requireAdmin()

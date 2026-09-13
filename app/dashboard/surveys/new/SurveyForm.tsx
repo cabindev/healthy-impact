@@ -163,6 +163,7 @@ export default function SurveyForm({
   const submitIneligible = async () => {
     setError(null)
     if (!f.collectorName) { setError('กรุณากรอกชื่อผู้เก็บข้อมูล'); return }
+    if (!f.tambon || !f.province) { setError('กรุณาเลือกตำบล (ข้อ 1.3–1.5) — ต้องระบุพื้นที่ทุกรายการ'); return }
     setSaving(true)
     try {
       await createIneligible({
@@ -185,6 +186,7 @@ export default function SurveyForm({
     if (f.residence6Months === '1') { setError('ผู้ตอบพักอาศัย < 6 เดือน — ไม่อยู่ในกลุ่มเป้าหมาย จบการสัมภาษณ์ (ข้อ 1.6)'); return }
     if (age != null && age < MIN_AGE) { setError(`อายุประมาณ ${age} ปี — ต่ำกว่า ${MIN_AGE} ปี ไม่อยู่ในกลุ่มเป้าหมาย (ข้อ 1.11)`); return }
     if (!f.collectorName) { setError('กรุณากรอกชื่อผู้เก็บข้อมูล'); return }
+    if (!f.tambon || !f.province) { setError('กรุณาเลือกตำบล (ข้อ 1.3–1.5) — ต้องระบุพื้นที่ทุกรายการ'); return }
     if (f.consentGiven !== '1') { setError('ต้องได้รับการยินยอม (ข้อ 1.7) จึงจะบันทึกได้'); return }
     if (f.nationalId && !/^\d{13}$/.test(f.nationalId.trim())) { setError('เลขบัตรประชาชนต้องเป็นตัวเลข 13 หลัก (ข้อ 1.8)'); return }
     // ข้อ 2.4 ระบุจำนวน ห้ามเว้นว่าง
@@ -237,7 +239,7 @@ export default function SurveyForm({
           <Field label="1.1 หมู่ที่"><Text value={f.villageNo ?? ''} onChange={(v) => set('villageNo', v)} placeholder="เช่น 5" /></Field>
           <Field label="1.2 ชื่อหมู่บ้าน"><Text value={f.villageName ?? ''} onChange={(v) => set('villageName', v)} placeholder="เช่น บ้านหนองบัว" /></Field>
         </div>
-        <Field label="1.3–1.5 ตำบล / อำเภอ / จังหวัด" hint="(เลือกตำบล แล้วอำเภอ-จังหวัดเติมอัตโนมัติ)">
+        <Field label="1.3–1.5 ตำบล / อำเภอ / จังหวัด" required hint="(เลือกตำบล แล้วอำเภอ-จังหวัดเติมอัตโนมัติ)">
           <TambonPicker
             value={{ tambon: f.tambon, amphoe: f.amphoe, province: f.province }}
             onChange={(g) => setF((p) => ({ ...p, tambon: g.tambon, amphoe: g.amphoe, province: g.province }))}

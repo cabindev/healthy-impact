@@ -98,6 +98,13 @@ User, Survey, SurveyTobacco, SurveyAlcohol
 - **หน้าโปรไฟล์** `app/dashboard/profile/page.tsx` — การ์ดบัญชี (avatar/สิทธิ์/วันเข้าร่วม/ขอบเขตการลบ), stat 6 ใบ (บันทึกทั้งหมด/เข้าเกณฑ์/ตรวจสอบแล้ว/30 วัน/พื้นที่/ล่าสุด), BarList แยกตามสถานที่·ความเสี่ยง·พื้นที่, รายการ 10 ใบล่าสุดกดเข้าตรวจสอบได้ (query `where: { creatorId: meId }`); เข้าจากบล็อกชื่อผู้ใช้ท้าย Sidebar
 - **หมายเหตุ:** `updateSurvey`/`verifySurvey` ยังเปิดให้ ADMIN ทุกคน (ตั้งใจ — ให้ตรวจงานข้ามกันได้)
 
+## 🧭 พื้นที่ (จังหวัด) — บังคับกรอก + ไล่แก้ของเก่า
+- **บังคับเลือกตำบล** ก่อนบันทึกทั้ง `submit()` และ `submitIneligible()` ใน `SurveyForm.tsx` (เดิมตรวจแค่ชื่อผู้เก็บ → ข้อมูลเก่าจึงมี `province = null` จำนวนมาก โดยเฉพาะจาก flow ไม่เข้าเกณฑ์)
+- **ตัวกรอง `?noArea=1`** (`buildSurveyWhere` + ชิปใน `AreaFilter.tsx`) — ดูเฉพาะรายการที่ยังไม่ระบุพื้นที่; แบนเนอร์เหลืองบนหน้ารายการบอกจำนวน + ลิงก์ "ไปแก้ไข"
+- **กำหนดพื้นที่ทีละหลายรายการ**: `AssignAreaDialog.tsx` (ปุ่มในแถบเลือก) → action `setSurveyArea(ids, area)` ใช้ `updateMany`
+  - เปิดให้ ADMIN ทุกคน **โดยตั้งใจ** — ข้อมูลเก่ามี `creatorId = null` ถ้าใช้กติกาเจ้าของแบบ delete จะไม่มีใครแก้ได้เลยนอกจาก SUPERADMIN
+  - `Dialog.Root` ต้องใส่ `disablePointerDismissal` และ `Combobox.Positioner` ใน `TambonPicker` ต้อง **z สูงกว่า Dialog (z-50)** ไม่งั้นรายการตำบลจมใต้ backdrop / คลิกแล้วปิด dialog ทิ้ง
+
 ## 🗺️ แผนที่รายจังหวัด (`/dashboard/map`)
 choropleth ความเข้มข้นการเก็บข้อมูล — อ้างอิงแนวทางจาก `htdocs/stopdrinknetwork` (`app/map`)
 - **Leaflet ล้วน** (ไม่ใช้ react-leaflet) โหลดใน `useEffect` เลี่ยง SSR + `next/dynamic` code-split; polygon จาก `app/data/thailand.json` (copy จาก stopdrinknetwork, 1.4MB, property `name_th`)

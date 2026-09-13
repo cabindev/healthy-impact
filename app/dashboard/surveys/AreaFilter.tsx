@@ -2,7 +2,7 @@
 
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { useMemo } from 'react'
-import { MapPin, X } from 'lucide-react'
+import { MapPin, MapPinOff, X } from 'lucide-react'
 import { PROVINCE_ZONE } from '@/app/lib/province-zone'
 
 export type GeoCombo = { province: string | null; amphoe: string | null; tambon: string | null; villageName: string | null }
@@ -29,7 +29,18 @@ export default function AreaFilter({ combos }: { combos: GeoCombo[] }) {
     tambon: searchParams.get('tambon') ?? '',
     village: searchParams.get('village') ?? '',
   }
-  const active = LEVELS.some((l) => current[l])
+  const noArea = searchParams.get('noArea') === '1'
+  const active = LEVELS.some((l) => current[l]) || noArea
+
+  // เลือกดู "ไม่ระบุพื้นที่" แล้วตัวกรองไล่ระดับใช้ไม่ได้ (ไม่มีค่าให้กรอง) — ล้างทิ้งพร้อมกัน
+  const toggleNoArea = () => {
+    const params = new URLSearchParams(searchParams.toString())
+    LEVELS.forEach((l) => params.delete(l))
+    if (noArea) params.delete('noArea')
+    else params.set('noArea', '1')
+    const qs = params.toString()
+    router.replace(qs ? `${pathname}?${qs}` : pathname)
+  }
 
   const options = useMemo(() => {
     const byZone = current.zone ? combos.filter((c) => c.province && PROVINCE_ZONE[c.province] === current.zone) : combos
@@ -59,6 +70,7 @@ export default function AreaFilter({ combos }: { combos: GeoCombo[] }) {
   const clearAll = () => {
     const params = new URLSearchParams(searchParams.toString())
     LEVELS.forEach((l) => params.delete(l))
+    params.delete('noArea')
     const qs = params.toString()
     router.replace(qs ? `${pathname}?${qs}` : pathname)
   }
@@ -73,7 +85,7 @@ export default function AreaFilter({ combos }: { combos: GeoCombo[] }) {
           key={level}
           value={current[level]}
           onChange={(e) => change(level, e.target.value)}
-          disabled={options[level].length === 0}
+          disabled={noArea || options[level].length === 0}
           className="px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-700 bg-white focus:outline-none focus:border-green-500 disabled:opacity-40 disabled:cursor-not-allowed">
           <option value="">{LABEL[level]}ทั้งหมด</option>
           {options[level].map((v) => (
@@ -81,6 +93,12 @@ export default function AreaFilter({ combos }: { combos: GeoCombo[] }) {
           ))}
         </select>
       ))}
+      <button type="button" onClick={toggleNoArea}
+        className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs border transition-colors ${
+          noArea ? 'border-amber-300 bg-amber-50 text-amber-700 font-medium' : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+        }`}>
+        <MapPinOff className="w-3.5 h-3.5" /> ไม่ระบุพื้นที่
+      </button>
       {active && (
         <button type="button" onClick={clearAll}
           className="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-red-500 px-1.5 py-1.5">

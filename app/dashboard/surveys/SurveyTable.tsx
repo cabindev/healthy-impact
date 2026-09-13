@@ -7,6 +7,7 @@ import { CheckCircle2, FileSpreadsheet, Eye, SquarePen, Trash2 } from 'lucide-re
 import { RISK_COLORS, type RiskLevel } from '@/app/lib/audit'
 import AuditTip from '@/app/components/AuditTip'
 import PrintSlipButton from './PrintSlipButton'
+import AssignAreaDialog from './AssignAreaDialog'
 import { deleteSurvey } from '@/app/actions/survey'
 
 export type SurveyRow = {
@@ -123,7 +124,11 @@ export default function SurveyTable({ rows, q, filterQuery = '' }: { rows: Surve
                     {r.eligible ? r.name : <span className="text-[11px] px-2 py-0.5 rounded-full bg-red-50 text-red-500 font-medium">ไม่เข้าเกณฑ์</span>}
                   </td>
                   <td className="px-4 py-3 text-gray-500">{r.site}</td>
-                  <td className="px-4 py-3 text-gray-500">{r.area}</td>
+                  <td className="px-4 py-3">
+                    {r.area === '—'
+                      ? <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-600 font-medium">ไม่ระบุพื้นที่</span>
+                      : <span className="text-gray-500">{r.area}</span>}
+                  </td>
                   <td className="px-4 py-3 text-right text-gray-700 tabular-nums">{r.audit ?? '—'}</td>
                   <td className="px-4 py-3">
                     {risk ? <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${RISK_COLORS[risk]}`}>{risk}</span> : <span className="text-gray-300">—</span>}
@@ -165,6 +170,7 @@ export default function SurveyTable({ rows, q, filterQuery = '' }: { rows: Surve
           <span className="text-sm text-gray-600">เลือกแล้ว <b className="text-gray-900 tabular-nums">{n}</b></span>
           <button type="button" onClick={() => setSelected(new Set())}
             className="text-sm text-gray-500 hover:text-gray-700 px-3 py-2 rounded-full">ล้าง</button>
+          <AssignAreaDialog ids={[...selected]} onDone={() => setSelected(new Set())} />
           <button type="button" onClick={exportSelected}
             className="inline-flex items-center gap-1.5 px-4 py-2 bg-green-600 text-white text-sm font-semibold rounded-full hover:bg-green-700 transition-colors">
             <FileSpreadsheet className="w-4 h-4" /> Export ที่เลือก
