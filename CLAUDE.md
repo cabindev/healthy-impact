@@ -98,6 +98,22 @@ User, Survey, SurveyTobacco, SurveyAlcohol
 - **หน้าโปรไฟล์** `app/dashboard/profile/page.tsx` — การ์ดบัญชี (avatar/สิทธิ์/วันเข้าร่วม/ขอบเขตการลบ), stat 6 ใบ (บันทึกทั้งหมด/เข้าเกณฑ์/ตรวจสอบแล้ว/30 วัน/พื้นที่/ล่าสุด), BarList แยกตามสถานที่·ความเสี่ยง·พื้นที่, รายการ 10 ใบล่าสุดกดเข้าตรวจสอบได้ (query `where: { creatorId: meId }`); เข้าจากบล็อกชื่อผู้ใช้ท้าย Sidebar
 - **หมายเหตุ:** `updateSurvey`/`verifySurvey` ยังเปิดให้ ADMIN ทุกคน (ตั้งใจ — ให้ตรวจงานข้ามกันได้)
 
+## 🗺️ แผนที่รายจังหวัด (`/dashboard/map`)
+choropleth ความเข้มข้นการเก็บข้อมูล — อ้างอิงแนวทางจาก `htdocs/stopdrinknetwork` (`app/map`)
+- **Leaflet ล้วน** (ไม่ใช้ react-leaflet) โหลดใน `useEffect` เลี่ยง SSR + `next/dynamic` code-split; polygon จาก `app/data/thailand.json` (copy จาก stopdrinknetwork, 1.4MB, property `name_th`)
+- ชื่อจังหวัดใน `tambon.json` (`CHANGWAT_T`) ตรงกับ `name_th` ครบ 77 จังหวัด — **ไม่ต้อง normalize**
+- ไล่เฉดเขียว 5 ขั้น · จังหวัดไม่มีข้อมูล = เทา · ปักตัวเลขจำนวนชิ้นงานกลางจังหวัด (divIcon `.hi-count` ใน globals.css, ตัวเลขบนเฉดเข้มเป็นสีขาว)
+- toggle ทั้งหมด/เฉพาะเข้าเกณฑ์ · คลิก polygon หรือรายชื่อจังหวัดเพื่อซูม + ดูสรุป (ทั้งหมด/เข้าเกณฑ์/ตรวจสอบแล้ว)
+- **`zoomSnap: 0.25`** จำเป็น — ค่า default (1) ทำให้ `fitBounds` ปัดซูมลงจนประเทศไทยลอยเล็กกลางกรอบ
+- **`isolation: isolate`** บน `.leaflet-container` — กัน pane ของ Leaflet (z-index 200–700) ทับ sidebar (z-40) บนมือถือ
+- **โหมดเต็มจอ** ปุ่ม "เต็มจอ" (ออกด้วย Esc) → wrapper เป็น `fixed inset-0 z-[60]` ครอบ sidebar; สลับแล้วต้อง `invalidateSize()` + `fitBounds()` ใหม่
+- **⚠️ ห้ามเปลี่ยน `className` ของ div ที่ Leaflet ถือ** — Leaflet ใส่ class ของตัวเอง (`leaflet-container` ฯลฯ) หลัง mount ถ้า React re-render ด้วย className ใหม่จะเขียนทับทั้ง attribute แล้วแผนที่พังทันที (tile หาย/จัดตำแหน่งเพี้ยน) → ให้ความสูงอยู่ที่ wrapper ชั้นนอก ส่วน div ของ Leaflet ใช้ `className="h-full w-full"` คงที่
+- **เมนูแผนที่บน TopNav** (`components/TopNav.tsx`) — แสดงเฉพาะ role ADMIN/SUPERADMIN
+- **แผนที่ย่อบนหน้าภาพรวม** `components/DashboardMiniMap.tsx` — วางข้างกราฟ "พื้นที่เก็บข้อมูล (จังหวัด)" (ช่องขวาของ grid เดิมว่างอยู่); อ่านอย่างเดียว ปิด drag/zoom ทั้งหมด กดแล้วไปหน้าแผนที่เต็ม
+- เฉดสี/ตัวช่วยแชร์กันที่ `app/lib/map-heat.ts` (`heatColor`/`isDarkStep`/`ProvinceStat`)
+- **⚠️ `.leaflet-container` ต้องเขียน selector ซ้ำ class** (`.leaflet-container.leaflet-container`) — `leaflet.css` ถูก inject หลัง `globals.css` ถ้าใช้ชั้นเดียวจะโดน `background: #ddd` ของ Leaflet ทับ (เห็นเป็นบล็อกเทาบนแผนที่ย่อที่ไม่มี tile)
+- โลโก้ "Healthy Impact" ใน Sidebar ลิงก์ไป `/` และ `app/page.tsx` **ไม่ redirect admin แล้ว** (แสดงปุ่มเข้าแดชบอร์ดแทน) — ตอน login `SignInForm.tsx` พา admin ไป `/dashboard` เองอยู่แล้ว
+
 ## 📊 Dashboard + Seed
 - **Dashboard กราฟ** (`app/dashboard/page.tsx` aggregate + `components/DashboardCharts.tsx`): ใช้ **shadcn charts** (Recharts v2 + `components/ui/chart.tsx` + theme tokens ใน globals.css + `cn` ที่ `app/lib/utils.ts`). KPI 6 ใบ + area รายวัน, donut ความเสี่ยง AUDIT/เพศ (center total), bar บุหรี่/อายุ/BMI/จังหวัด. นับเฉพาะ eligible
   - **หมายเหตุ:** เคยลอง ApexCharts แต่ `react-apexcharts` พังกับ React 19 (`reading 'node'`) → ย้ายมา shadcn/Recharts v2 (อย่าใช้ react-apexcharts)

@@ -4,11 +4,12 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import { useDashboard } from '../context/DashboardContext'
-import { LayoutDashboard, ClipboardList, Users, Menu, X, ChevronRight, LogOut } from 'lucide-react'
+import { LayoutDashboard, ClipboardList, Map, Users, Menu, X, ChevronRight, LogOut } from 'lucide-react'
 
 const NAV = [
   { href: '/dashboard',         label: 'ภาพรวม',     icon: LayoutDashboard,  desc: 'สรุปข้อมูล KPI' },
   { href: '/dashboard/surveys', label: 'แบบสอบถาม',  icon: ClipboardList,    desc: 'ค้นหา · เลือก · Export · พิมพ์' },
+  { href: '/dashboard/map',     label: 'แผนที่',      icon: Map,              desc: 'แสดงข้อมูลจังหวัด' },
   { href: '/dashboard/users',   label: 'ผู้ใช้งาน',   icon: Users,            desc: 'จัดการสิทธิ์' },
 ]
 
@@ -39,14 +40,14 @@ export default function Sidebar({ user }: SidebarProps) {
       {/* Logo + toggles */}
       <div className="flex items-center justify-between h-16 px-4 border-b border-white/[0.06]">
         {!sidebarCollapsed ? (
-          <Link href="/dashboard" className="flex items-center gap-2 min-w-0" onClick={handleNavClick}>
+          <Link href="/" className="flex items-center gap-2 min-w-0" onClick={handleNavClick} title="กลับหน้าแรก">
             <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center shrink-0">
               <span className="text-white font-black text-[10px]">HI</span>
             </div>
             <span className="font-semibold tracking-tight text-sm truncate">Healthy Impact</span>
           </Link>
         ) : (
-          <Link href="/dashboard" className="mx-auto" onClick={handleNavClick}>
+          <Link href="/" className="mx-auto" onClick={handleNavClick} title="กลับหน้าแรก">
             <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center">
               <span className="text-white font-black text-[10px]">HI</span>
             </div>

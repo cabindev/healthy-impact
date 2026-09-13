@@ -76,3 +76,34 @@ input:-webkit-autofill:active {
 }
 
 /* การพิมพ์สลิปแบบสอบถามรายคน จัดการเองใน iframe (PrintSlipButton.tsx) — ไม่ต้องมี @media print ที่นี่ */
+
+/* ───── แผนที่ Leaflet (app/dashboard/map) ───── */
+
+/* ซ่อนกรอบ focus สี่เหลี่ยมน้ำเงินตอนคลิก polygon — ไฮไลต์จังหวัดใช้เส้นขอบเข้มของเราเอง */
+.leaflet-container path:focus,
+.leaflet-interactive:focus,
+.leaflet-container:focus { outline: none; }
+
+/* isolation: Leaflet ตั้ง z-index 200–700 ให้ pane ของมันเอง ถ้าไม่สร้าง stacking context
+   แผนที่จะทับ sidebar (z-40) ตอนเปิดเมนูบนมือถือ */
+/* ซ้ำ class เพื่อดัน specificity — leaflet.css ถูก inject ทีหลัง globals.css
+   ถ้าใช้ selector ชั้นเดียวจะโดน background: #ddd ของ Leaflet ทับ (เห็นชัดบนแผนที่ย่อที่ไม่มี tile) */
+.leaflet-container.leaflet-container { font-family: inherit; background: #ffffff; isolation: isolate; }
+
+/* ตัวเลขจำนวนชิ้นงานกลางจังหวัด — วางกึ่งกลาง centroid ด้วย translate เพราะ iconSize = 0 */
+.hi-count-label { background: none; border: none; }
+.hi-count {
+  display: inline-block;
+  transform: translate(-50%, -50%);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  color: #111827;
+  text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.hi-count-on-dark { color: #ffffff; text-shadow: 0 0 3px rgba(0,0,0,.55), 0 0 3px rgba(0,0,0,.55); }
+
+/* แผนที่ย่อบนหน้าภาพรวม — ตัวเลขเล็กลงให้พอดีจังหวัดในกรอบแคบ */
+.hi-count-sm { font-size: 10px; }

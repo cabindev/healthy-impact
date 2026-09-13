@@ -4,6 +4,8 @@ import { Bar, BarChart, CartesianGrid, Cell, Label, LabelList, Pie, PieChart, XA
 import {
   ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent, type ChartConfig,
 } from '@/app/components/ui/chart'
+import DashboardMiniMap from './DashboardMiniMap'
+import type { ProvinceStat } from '@/app/lib/map-heat'
 
 export type Named = { name: string; value: number; color?: string }
 export type Trend = { date: string; count: number }
@@ -197,7 +199,7 @@ export function BmiMini({ data }: { data: Named[] }) {
   )
 }
 
-export default function DashboardCharts({ data }: { data: ChartsData }) {
+export default function DashboardCharts({ data, provinceStats }: { data: ChartsData; provinceStats: ProvinceStat[] }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       <Donut data={data.risk} title="ระดับความเสี่ยงการดื่ม (AUDIT)" sub="ตามเกณฑ์ WHO / ศวส." />
@@ -205,6 +207,7 @@ export default function DashboardCharts({ data }: { data: ChartsData }) {
       <BarHorizontal data={data.smoke} title="สถานะการสูบบุหรี่" distributed />
       <BarVertical data={data.age} title="ช่วงอายุผู้ตอบ" distributed />
       <BarHorizontal data={data.province} title="พื้นที่เก็บข้อมูล (จังหวัด)" sub="กระจายตามจังหวัด" color="#16A34A" />
+      <DashboardMiniMap stats={provinceStats} />
     </div>
   )
 }

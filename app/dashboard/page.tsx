@@ -2,6 +2,7 @@ import { prisma } from '@/app/lib/prisma'
 import { thaiAge, calcBMI, bmiCategory } from '@/app/lib/health'
 import { DatabaseZap } from 'lucide-react'
 import DashboardCharts, { type ChartsData, TrendHeatmap, BmiMini } from './components/DashboardCharts'
+import type { ProvinceStat } from '@/app/lib/map-heat'
 
 export const dynamic = 'force-dynamic'
 
@@ -139,6 +140,19 @@ export default async function DashboardHome() {
     return { date: key, count: dayCount.get(key) ?? 0 }
   })
 
+  // สถิติรายจังหวัดสำหรับแผนที่ย่อ — นับทุกใบรวมที่ไม่เข้าเกณฑ์ ให้ตรงกับหน้าแผนที่เต็ม
+  const provMapAll = new Map<string, ProvinceStat>()
+  for (const s2 of surveys) {
+    const name = s2.province?.trim()
+    if (!name) continue
+    const stat = provMapAll.get(name) ?? { province: name, total: 0, eligible: 0, verified: 0 }
+    stat.total += 1
+    if (s2.eligible) stat.eligible += 1
+    if (s2.verifiedAt) stat.verified += 1
+    provMapAll.set(name, stat)
+  }
+  const provinceStats = [...provMapAll.values()]
+
   const charts: ChartsData = { risk, smoke, site, age, province, trend, gender, bmi }
 
   return (
@@ -179,7 +193,7 @@ export default async function DashboardHome() {
           ยังไม่มีข้อมูล — เริ่มที่เมนู <span className="font-medium text-gray-600">แบบสอบถาม</span>
         </div>
       ) : (
-        <DashboardCharts data={charts} />
+        <DashboardCharts data={charts} provinceStats={provinceStats} />
       )}
     </div>
   )

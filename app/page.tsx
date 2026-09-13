@@ -1,16 +1,14 @@
 import { getServerSession } from 'next-auth'
 import authOptions from '@/app/lib/configs/auth/authOptions'
-import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { Shield, ClipboardList, Cigarette, Wine, Car } from 'lucide-react'
+import { LayoutDashboard, Shield, ClipboardList, Cigarette, Wine, Car } from 'lucide-react'
 import SignOutButton from '@/app/components/auth/SignOutButton'
 
 export default async function Home() {
   const session = await getServerSession(authOptions)
-
-  if (session?.user.role === 'ADMIN' || session?.user.role === 'SUPERADMIN') {
-    redirect('/dashboard')
-  }
+  // ไม่ redirect admin ออกจากหน้านี้ — โลโก้ในแดชบอร์ดลิงก์กลับมาที่นี่ได้
+  // (ตอน login ฟอร์ม signin พาไป /dashboard ให้เองอยู่แล้ว)
+  const isAdmin = session?.user.role === 'ADMIN' || session?.user.role === 'SUPERADMIN'
 
   return (
     <div className="min-h-screen flex flex-col bg-[#0a0a0a] text-white">
@@ -26,7 +24,13 @@ export default async function Home() {
         <div className="flex items-center gap-2">
           {session ? (
             <div className="flex items-center gap-3">
-              <span className="text-sm text-white/40">{session.user.firstName}</span>
+              {isAdmin && (
+                <Link href="/dashboard"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 transition-colors">
+                  <LayoutDashboard className="w-4 h-4" /> แดชบอร์ด
+                </Link>
+              )}
+              <span className="hidden sm:block text-sm text-white/40">{session.user.firstName}</span>
               <SignOutButton />
             </div>
           ) : (
@@ -67,6 +71,11 @@ export default async function Home() {
               สมัครสมาชิก
             </Link>
           </div>
+        ) : isAdmin ? (
+          <Link href="/dashboard"
+            className="inline-flex items-center gap-2 px-8 py-3 bg-green-600 text-white font-bold rounded-xl hover:bg-green-700 transition-colors text-sm">
+            <LayoutDashboard className="w-4 h-4" /> เข้าสู่แดชบอร์ด
+          </Link>
         ) : (
           <div className="border border-white/[0.08] rounded-xl px-6 py-4 text-center bg-white/[0.02]">
             <p className="text-white/40 text-sm mb-1">บัญชีของคุณยังรอการอนุมัติสิทธิ์</p>
