@@ -1,15 +1,16 @@
 'use client'
 
 // แผนที่ย่อบนหน้าภาพรวม — อ่านอย่างเดียว ไม่ให้ลาก/ซูม (กันแย่ง scroll ของหน้า)
+// ไม่ใส่ตัวหนังสือบนแผนที่ ให้ดูสะอาด — ตัวเลขรายจังหวัดอ่านจากกราฟแท่งที่อยู่ข้างกัน
 // กดที่การ์ดเพื่อไปหน้าแผนที่เต็ม
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import type { Map as LeafletMap, GeoJSON as GeoJSONLayer, Marker } from 'leaflet'
+import type { Map as LeafletMap } from 'leaflet'
 import { ArrowUpRight } from 'lucide-react'
 import 'leaflet/dist/leaflet.css'
 import thailandGeo from '@/app/data/thailand.json'
-import { heatColor, isDarkStep, type ProvinceStat } from '@/app/lib/map-heat'
+import { heatColor, type ProvinceStat } from '@/app/lib/map-heat'
 
 export default function DashboardMiniMap({ stats }: { stats: ProvinceStat[] }) {
   const mapElRef = useRef<HTMLDivElement>(null)
@@ -38,30 +39,12 @@ export default function DashboardMiniMap({ stats }: { stats: ProvinceStat[] }) {
       })
 
       const byProvince = new Map(stats.map((s) => [s.province, s]))
-      const labels: Marker[] = []
 
       const geoLayer = L.geoJSON(thailandGeo as GeoJSON.GeoJsonObject, {
         interactive: false,
         style: (feature) => {
           const value = byProvince.get(feature?.properties?.name_th as string)?.total ?? 0
           return { fillColor: heatColor(value, max), fillOpacity: 0.9, color: '#ffffff', weight: 0.75 }
-        },
-        onEachFeature: (feature, layer) => {
-          const name = feature?.properties?.name_th as string
-          const value = byProvince.get(name)?.total ?? 0
-          if (!name || value <= 0) return
-          const center = (layer as GeoJSONLayer).getBounds().getCenter()
-          labels.push(
-            L.marker(center, {
-              interactive: false,
-              keyboard: false,
-              icon: L.divIcon({
-                className: 'hi-count-label',
-                html: `<span class="hi-count hi-count-sm ${isDarkStep(value, max) ? 'hi-count-on-dark' : ''}">${value.toLocaleString()}</span>`,
-                iconSize: [0, 0],
-              }),
-            }).addTo(map),
-          )
         },
       }).addTo(map)
 

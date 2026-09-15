@@ -54,6 +54,7 @@ export default async function SurveysPage({ searchParams }: { searchParams: Prom
     audit: s.alcohol?.auditScore ?? null,
     risk: s.alcohol?.riskLevel ?? null,
     eligible: s.eligible,
+    reason: s.ineligibleReason,
     verified: !!s.verifiedAt,
     canDelete: canManageSurvey(session?.user, s.creatorId),
   }))

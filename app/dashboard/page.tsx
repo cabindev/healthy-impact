@@ -3,6 +3,8 @@ import { thaiAge, calcBMI, bmiCategory } from '@/app/lib/health'
 import { DatabaseZap } from 'lucide-react'
 import DashboardCharts, { type ChartsData, TrendHeatmap, BmiMini } from './components/DashboardCharts'
 import type { ProvinceStat } from '@/app/lib/map-heat'
+import { tallyIneligible } from '@/app/lib/eligibility'
+import EligibilityTip from '@/app/components/EligibilityTip'
 
 export const dynamic = 'force-dynamic'
 
@@ -74,6 +76,8 @@ export default async function DashboardHome() {
 
   const eligible = surveys.filter((s) => s.eligible)
   const ineligibleCount = surveys.length - eligible.length
+  // แยกเหตุคัดออก เพื่อให้เจ้าหน้าที่เห็นว่าที่สัมภาษณ์ไม่จบเป็นเพราะอะไรบ้าง
+  const ineligibleReasons = tallyIneligible(surveys.filter((s) => !s.eligible).map((s) => s.ineligibleReason))
 
   // KPI
   const smokers = eligible.filter((s) => s.tobacco && ['1', '2'].includes(s.tobacco.smokeStatus ?? '')).length
@@ -81,9 +85,9 @@ export default async function DashboardHome() {
   const highRisk = eligible.filter((s) => (s.alcohol?.auditScore ?? 0) >= 8).length
   const drinkDrive = eligible.filter((s) => ['2', '3', '4'].includes(s.ddDroveAfterDrink ?? '')).length
 
-  const cards = [
+  const cards: { label: string; value: number; hint?: string }[] = [
     { label: 'แบบสอบถามทั้งหมด', value: surveys.length },
-    { label: 'เข้าเกณฑ์', value: eligible.length },
+    { label: 'เข้าเกณฑ์', value: eligible.length, hint: `ไม่เข้าเกณฑ์ ${ineligibleCount.toLocaleString()}` },
     { label: 'สูบบุหรี่ปัจจุบัน', value: smokers },
     { label: 'ดื่มแอลกอฮอล์', value: drinkers },
     { label: 'เสี่ยงสูง (AUDIT ≥ 8)', value: highRisk },
@@ -168,10 +172,11 @@ export default async function DashboardHome() {
       {/* แผงสรุปแบบ Claude: stat boxes + heatmap ในกล่องเทาเดียว */}
       <div className="bg-gray-100/70 rounded-2xl p-4 sm:p-5 space-y-4">
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-2.5">
-          {cards.map(({ label, value }) => (
+          {cards.map(({ label, value, hint }) => (
             <div key={label} className="bg-gray-200/60 rounded-xl px-4 py-3">
               <span className="block text-[13px] text-gray-500 truncate">{label}</span>
               <p className="mt-0.5 text-2xl font-bold text-gray-900">{value.toLocaleString()}</p>
+              {hint && <span className="block text-xs text-gray-500 mt-0.5 truncate">{hint}</span>}
             </div>
           ))}
         </div>
@@ -186,6 +191,19 @@ export default async function DashboardHome() {
         <p className="text-[13px] text-gray-400">
           เก็บข้อมูล {trend.reduce((s, d) => s + d.count, 0).toLocaleString()} แบบสอบถามในช่วง 180 วันล่าสุด
         </p>
+
+        {/* เหตุที่สัมภาษณ์ไม่จบ — เห็นได้ทันทีโดยไม่ต้องเปิดทีละรายการ */}
+        <div className="flex flex-wrap items-center gap-2 pt-1">
+          <span className="inline-flex items-center gap-1 text-[13px] text-gray-500">
+            คัดออก {ineligibleCount.toLocaleString()} ราย <EligibilityTip />
+          </span>
+          {ineligibleReasons.map((r) => (
+            <span key={r.key} className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-white text-gray-600 border border-gray-200">
+              {r.label} <b className="tabular-nums text-gray-900">{r.count.toLocaleString()}</b>
+            </span>
+          ))}
+          {ineligibleCount === 0 && <span className="text-xs text-gray-400">ยังไม่มีรายการที่ถูกคัดออก</span>}
+        </div>
       </div>
 
       {surveys.length === 0 ? (

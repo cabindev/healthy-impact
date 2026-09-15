@@ -19,6 +19,8 @@ export type SurveyRow = {
   audit: number | null
   risk: string | null
   eligible: boolean
+  /** เหตุที่ถูกคัดออก (เฉพาะ eligible = false) */
+  reason: string | null
   verified: boolean
   canDelete: boolean
 }
@@ -121,7 +123,12 @@ export default function SurveyTable({ rows, q, filterQuery = '' }: { rows: Surve
                     </span>
                   </td>
                   <td className="px-4 py-3 text-gray-700">
-                    {r.eligible ? r.name : <span className="text-[11px] px-2 py-0.5 rounded-full bg-red-50 text-red-500 font-medium">ไม่เข้าเกณฑ์</span>}
+                    {r.eligible ? r.name : (
+                      <span className="inline-flex flex-col gap-0.5">
+                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-red-50 text-red-500 font-medium self-start">ไม่เข้าเกณฑ์</span>
+                        {r.reason && <span className="text-[11px] text-gray-400">{r.reason}</span>}
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-gray-500">{r.site}</td>
                   <td className="px-4 py-3">

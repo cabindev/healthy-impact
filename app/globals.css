@@ -90,20 +90,20 @@ input:-webkit-autofill:active {
    ถ้าใช้ selector ชั้นเดียวจะโดน background: #ddd ของ Leaflet ทับ (เห็นชัดบนแผนที่ย่อที่ไม่มี tile) */
 .leaflet-container.leaflet-container { font-family: inherit; background: #ffffff; isolation: isolate; }
 
-/* ตัวเลขจำนวนชิ้นงานกลางจังหวัด — วางกึ่งกลาง centroid ด้วย translate เพราะ iconSize = 0 */
-.hi-count-label { background: none; border: none; }
-.hi-count {
+
+/* ป้ายชื่อจังหวัด + จำนวน กลาง polygon (dashboard/map)
+   iconSize เป็น 0 ทั้งคู่ จึงจัดกึ่งกลาง centroid ด้วย translate เอา */
+.hi-prov-label { background: none; border: none; }
+.hi-prov {
   display: inline-block;
   transform: translate(-50%, -50%);
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 1;
-  color: #111827;
-  text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff;
+  text-align: center;
+  line-height: 1.15;
   white-space: nowrap;
   pointer-events: none;
+  color: #111827;
+  text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff;
 }
-.hi-count-on-dark { color: #ffffff; text-shadow: 0 0 3px rgba(0,0,0,.55), 0 0 3px rgba(0,0,0,.55); }
-
-/* แผนที่ย่อบนหน้าภาพรวม — ตัวเลขเล็กลงให้พอดีจังหวัดในกรอบแคบ */
-.hi-count-sm { font-size: 10px; }
+.hi-prov b { display: block; font-size: 11px; font-weight: 600; }
+.hi-prov i { display: block; font-size: 12px; font-weight: 800; font-style: normal; }
+.hi-prov-on-dark { color: #ffffff; text-shadow: 0 0 3px rgba(0,0,0,.6), 0 0 3px rgba(0,0,0,.6); }

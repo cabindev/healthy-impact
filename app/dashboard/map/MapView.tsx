@@ -1,11 +1,13 @@
 'use client'
 
 // แผนที่ความเข้มข้นการเก็บข้อมูลรายจังหวัด — ระบายสี polygon ตามจำนวนแบบสอบถาม
-// และปักตัวเลขจำนวนชิ้นงานไว้กลางจังหวัดที่มีข้อมูล
+// ปักชื่อจังหวัด + จำนวนชิ้นงานไว้กลาง polygon ของตัวเอง — เฉพาะจังหวัดที่มีข้อมูล
+// (ถ้าปักครบ 77 จังหวัดตัวหนังสือจะทับกันจนอ่านไม่ออกที่ระดับซูมทั้งประเทศ)
+// จังหวัดที่ยังไม่มีข้อมูลดูชื่อได้จาก hover — ชี้แล้วขึ้น tooltip และแถวในแผงอันดับสว่างตาม
 // ใช้ Leaflet ล้วน โหลดใน useEffect เพื่อเลี่ยง SSR
 
-import { useEffect, useMemo, useRef, useState } from 'react'
-import type { Map as LeafletMap, GeoJSON as GeoJSONLayer, LatLngBounds, Marker } from 'leaflet'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { Map as LeafletMap, GeoJSON as GeoJSONLayer, LatLngBounds, Marker, Path } from 'leaflet'
 import { Expand, MapPin, Maximize2, Shrink } from 'lucide-react'
 import 'leaflet/dist/leaflet.css'
 import thailandGeo from '@/app/data/thailand.json'
@@ -19,6 +21,7 @@ export default function MapView({ stats }: { stats: ProvinceStat[] }) {
   const mapElRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<LeafletMap | null>(null)
   const geoLayerRef = useRef<GeoJSONLayer | null>(null)
+  const layersRef = useRef<Map<string, Path>>(new Map())
   const labelsRef = useRef<Marker[]>([])
   const centersRef = useRef<Map<string, [number, number]>>(new Map())
   const boundsRef = useRef<Map<string, LatLngBounds>>(new Map())
@@ -27,6 +30,8 @@ export default function MapView({ stats }: { stats: ProvinceStat[] }) {
   const [mapReady, setMapReady] = useState(false)
   const [metric, setMetric] = useState<Metric>('total')
   const [selected, setSelected] = useState('')
+  const [hovered, setHovered] = useState('')
+  const [zoom, setZoom] = useState(0)
   const [fullscreen, setFullscreen] = useState(false)
 
   const byProvince = useMemo(() => new Map(stats.map((s) => [s.province, s])), [stats])
@@ -63,12 +68,17 @@ export default function MapView({ stats }: { stats: ProvinceStat[] }) {
           const name = feature?.properties?.name_th as string
           if (!name) return
           const bounds = (layer as GeoJSONLayer).getBounds()
-          centersRef.current.set(name, [bounds.getCenter().lat, bounds.getCenter().lng])
           boundsRef.current.set(name, bounds)
+          centersRef.current.set(name, [bounds.getCenter().lat, bounds.getCenter().lng])
+          layersRef.current.set(name, layer as Path)
           layer.bindTooltip(name, { sticky: true })
           layer.on('click', () => setSelected((prev) => (prev === name ? '' : name)))
+          layer.on('mouseover', () => setHovered(name))
+          layer.on('mouseout', () => setHovered(''))
         },
       }).addTo(map)
+
+      map.on('zoomend', () => setZoom(map.getZoom()))
 
       fullBoundsRef.current = geoLayer.getBounds()
       map.fitBounds(fullBoundsRef.current, { padding: [16, 16] })
@@ -85,24 +95,22 @@ export default function MapView({ stats }: { stats: ProvinceStat[] }) {
     }
   }, [])
 
-  // ระบายสี + ปักตัวเลข ทุกครั้งที่เกณฑ์/จังหวัดที่เลือกเปลี่ยน
+  const styleFor = useCallback((name: string, isHovered: boolean) => {
+    const value = byProvince.get(name)?.[metric] ?? 0
+    const isSelected = name === selected
+    return {
+      fillColor: heatColor(value, max),
+      fillOpacity: isHovered ? 1 : 0.85,
+      color: isSelected ? '#111827' : isHovered ? '#374151' : '#ffffff',
+      weight: isSelected ? 2.5 : isHovered ? 2 : 1,
+    }
+  }, [byProvince, metric, max, selected])
+
+  // ระบายสีใหม่เมื่อเกณฑ์/จังหวัดที่เลือกเปลี่ยน
   useEffect(() => {
     if (!mapReady || !mapRef.current) return
-    ;(async () => {
-      const L = (await import('leaflet')).default
-      const map = mapRef.current!
-
-      geoLayerRef.current?.setStyle((feature) => {
-        const name = feature?.properties?.name_th as string
-        const value = byProvince.get(name)?.[metric] ?? 0
-        const isSelected = name === selected
-        return {
-          fillColor: heatColor(value, max),
-          fillOpacity: 0.85,
-          color: isSelected ? '#111827' : '#ffffff',
-          weight: isSelected ? 2.5 : 1,
-        }
-      })
+    ;(() => {
+      geoLayerRef.current?.setStyle((feature) => styleFor(feature?.properties?.name_th as string, false))
 
       geoLayerRef.current?.eachLayer((layer) => {
         const feature = (layer as GeoJSONLayer & { feature?: GeoJSON.Feature }).feature
@@ -116,10 +124,18 @@ export default function MapView({ stats }: { stats: ProvinceStat[] }) {
         )
       })
     })()
-  }, [mapReady, byProvince, metric, max, selected])
+  }, [mapReady, byProvince, styleFor])
 
-  // ตัวเลขจำนวนชิ้นงานกลางจังหวัด — แสดงเฉพาะจังหวัดที่มีข้อมูล ไม่งั้นแผนที่รก
-  // แยกจาก effect ระบายสีโดยตั้งใจ: ไม่ผูกกับ selected จะได้ไม่สร้าง marker ใหม่ระหว่าง flyTo
+  // ไฮไลต์เฉพาะจังหวัดที่ชี้อยู่ — แตะแค่ 2 layer ไม่ต้อง setStyle ใหม่ทั้ง 77 จังหวัดทุกครั้งที่เมาส์ขยับ
+  useEffect(() => {
+    if (!mapReady) return
+    const layer = hovered ? layersRef.current.get(hovered) : null
+    layer?.setStyle(styleFor(hovered, true))
+    return () => { layer?.setStyle(styleFor(hovered, false)) }
+  }, [mapReady, hovered, styleFor])
+
+  // ป้ายชื่อจังหวัด + จำนวน กลาง polygon — เฉพาะจังหวัดที่มีข้อมูล
+  // แยกจาก effect ระบายสีโดยตั้งใจ: ไม่ผูกกับ selected/hovered จะได้ไม่สร้าง marker ใหม่ระหว่าง flyTo
   useEffect(() => {
     if (!mapReady || !mapRef.current) return
     ;(async () => {
@@ -131,21 +147,34 @@ export default function MapView({ stats }: { stats: ProvinceStat[] }) {
         const value = s[metric]
         if (value <= 0) return
         const center = centersRef.current.get(province)
-        if (!center) return
+        const bounds = boundsRef.current.get(province)
+        if (!center || !bounds) return
+
+        // จังหวัดเล็ก ๆ (กรุงเทพฯ อยุธยา สมุทรฯ) ชื่อยาวกว่าตัว polygon — ที่ระดับซูมทั้งประเทศ
+        // จะล้นไปทับจังหวัดข้างเคียง จึงโชว์แค่ตัวเลขก่อน แล้วค่อยมีชื่อเมื่อซูมจนกว้างพอ
+        const widthPx =
+          map.latLngToContainerPoint(bounds.getNorthEast()).x -
+          map.latLngToContainerPoint(bounds.getNorthWest()).x
+        // 26px คือจุดที่วัดจากของจริง: ระดับซูมทั้งประเทศจังหวัดใหญ่กว้างราว 30px+ (ได้ชื่อ)
+        // ส่วนกรุงเทพฯ/อยุธยา ~12-15px (เหลือแค่ตัวเลข) แล้วค่อยมีชื่อเมื่อซูมเข้าไป
+        const showName = widthPx >= 26
+
         const dark = isDarkStep(value, max)
         const marker = L.marker(center, {
           interactive: false,
           keyboard: false,
           icon: L.divIcon({
-            className: 'hi-count-label',
-            html: `<span class="hi-count ${dark ? 'hi-count-on-dark' : ''}">${value.toLocaleString()}</span>`,
+            className: 'hi-prov-label',
+            html: `<span class="hi-prov ${dark ? 'hi-prov-on-dark' : ''}">${
+              showName ? `<b>${province}</b>` : ''
+            }<i>${value.toLocaleString()}</i></span>`,
             iconSize: [0, 0],
           }),
         }).addTo(map)
         labelsRef.current.push(marker)
       })
     })()
-  }, [mapReady, byProvince, metric, max])
+  }, [mapReady, byProvince, metric, max, zoom])
 
   // สลับโหมดเต็มจอแล้วกรอบแผนที่เปลี่ยนขนาด — Leaflet ต้องถูกสั่งให้วัดใหม่ ไม่งั้นแผนที่เพี้ยน
   useEffect(() => {
@@ -246,15 +275,20 @@ export default function MapView({ stats }: { stats: ProvinceStat[] }) {
         <div className="px-4 py-3 border-b border-gray-100">
           <h2 className="text-sm font-semibold text-gray-800">จังหวัดที่ขับเคลื่อน</h2>
           <p className="text-xs text-gray-400 mt-0.5">
-            {ranked.length > 0 ? `${ranked.length} จาก 77 จังหวัด · กดเพื่อซูม` : 'ยังไม่มีจังหวัดใดมีข้อมูล'}
+            {ranked.length > 0 ? `${ranked.length} จาก 77 จังหวัด · ชี้เพื่อไฮไลต์ · กดเพื่อซูม` : 'ยังไม่มีจังหวัดใดมีข้อมูล'}
           </p>
         </div>
         <ul className={`divide-y divide-gray-50 overflow-y-auto ${fullscreen ? 'max-h-[calc(100vh-220px)]' : 'max-h-[68vh]'}`}>
           {ranked.map((s, i) => (
             <li key={s.province}>
-              <button type="button" onClick={() => setSelected((prev) => (prev === s.province ? '' : s.province))}
+              <button type="button"
+                onClick={() => setSelected((prev) => (prev === s.province ? '' : s.province))}
+                onMouseEnter={() => setHovered(s.province)}
+                onMouseLeave={() => setHovered('')}
+                onFocus={() => setHovered(s.province)}
+                onBlur={() => setHovered('')}
                 className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-left transition-colors ${
-                  selected === s.province ? 'bg-green-50' : 'hover:bg-gray-50/60'
+                  selected === s.province ? 'bg-green-50' : hovered === s.province ? 'bg-gray-100' : 'hover:bg-gray-50/60'
                 }`}>
                 <span className="text-xs text-gray-300 w-5 tabular-nums">{i + 1}</span>
                 <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: heatColor(s[metric], max) }} />
