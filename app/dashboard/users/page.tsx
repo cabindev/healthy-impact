@@ -25,7 +25,12 @@ export default async function UsersPage() {
   const users = await prisma.user.findMany({
     where: { OR: [{ role: { not: 'SUPERADMIN' } }, ...(meId ? [{ id: meId }] : [])] },
     orderBy: { createdAt: 'desc' },
-    select: { id: true, firstName: true, lastName: true, email: true, role: true, createdAt: true },
+    select: {
+      id: true, firstName: true, lastName: true, email: true, role: true, createdAt: true,
+      province: true, zone: true,
+      // จำนวนแบบสอบถามที่ผู้ใช้คนนี้เป็นผู้บันทึก (ผูกจาก Survey.creatorId)
+      _count: { select: { surveys: true } },
+    },
   })
 
   // เรียงตามสิทธิ์: SUPERADMIN → ADMIN → MEMBER (ในกลุ่มเดียวกันคงลำดับใหม่สุดก่อนตาม createdAt)
@@ -52,17 +57,29 @@ export default async function UsersPage() {
             <tr>
               <th className="text-left font-medium px-4 py-3">ชื่อ</th>
               <th className="text-left font-medium px-4 py-3">อีเมล</th>
+              <th className="text-left font-medium px-4 py-3">สังกัด</th>
+              <th className="text-right font-medium px-4 py-3">จำนวนงาน</th>
               <th className="text-left font-medium px-4 py-3">สิทธิ์</th>
               {isSuperAdmin && <th className="px-4 py-3 w-24"></th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {users.length === 0 ? (
-              <tr><td colSpan={isSuperAdmin ? 4 : 3} className="px-4 py-8 text-center text-gray-400">ยังไม่มีผู้ใช้งาน</td></tr>
+              <tr><td colSpan={isSuperAdmin ? 6 : 5} className="px-4 py-8 text-center text-gray-400">ยังไม่มีผู้ใช้งาน</td></tr>
             ) : users.map((u) => (
               <tr key={u.id}>
                 <td className="px-4 py-3 text-gray-700">{u.firstName} {u.lastName}{u.id === meId && <span className="text-gray-400 text-xs ml-1">(คุณ)</span>}</td>
                 <td className="px-4 py-3 text-gray-500">{u.email}</td>
+                <td className="px-4 py-3">
+                  {u.province
+                    ? <span className="text-gray-700">{u.province}<span className="text-gray-400"> · ภาค{u.zone ?? 'ไม่ทราบ'}</span></span>
+                    : <span className="text-gray-300">ไม่ระบุ</span>}
+                </td>
+                <td className="px-4 py-3 text-right tabular-nums">
+                  {u._count.surveys > 0
+                    ? <span className="text-gray-800 font-medium">{u._count.surveys.toLocaleString()}</span>
+                    : <span className="text-gray-300">0</span>}
+                </td>
                 <td className="px-4 py-3">
                   <RoleSelect
                     userId={u.id}
@@ -74,7 +91,7 @@ export default async function UsersPage() {
                 {isSuperAdmin && (
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-3">
-                      <EditUserButton user={{ id: u.id, firstName: u.firstName, lastName: u.lastName, email: u.email, role: u.role as RoleValue }} isSelf={u.id === meId} />
+                      <EditUserButton user={{ id: u.id, firstName: u.firstName, lastName: u.lastName, email: u.email, role: u.role as RoleValue, province: u.province }} isSelf={u.id === meId} />
                       {u.id !== meId && <DeleteUserButton user={{ id: u.id, firstName: u.firstName, lastName: u.lastName, email: u.email, role: u.role as RoleValue }} />}
                     </div>
                   </td>

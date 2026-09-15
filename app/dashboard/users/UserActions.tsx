@@ -5,10 +5,12 @@ import { useRouter } from 'next/navigation'
 import { Dialog } from '@base-ui-components/react/dialog'
 import { UserPlus, SquarePen, Trash2, X, Loader2 } from 'lucide-react'
 import { createUser, updateUser, deleteUser, type RoleValue, type UserInput } from '@/app/actions/user'
+import { PROVINCE_ZONE } from '@/app/lib/province-zone'
 
 const ROLES: RoleValue[] = ['MEMBER', 'ADMIN', 'SUPERADMIN']
+const PROVINCES = Object.keys(PROVINCE_ZONE).sort((a, b) => a.localeCompare(b, 'th'))
 
-export type UserLite = { id: number; firstName: string; lastName: string; email: string; role: RoleValue }
+export type UserLite = { id: number; firstName: string; lastName: string; email: string; role: RoleValue; province?: string | null }
 
 const field = 'w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-white text-gray-800 focus:outline-none focus:border-green-500'
 const label = 'block text-xs font-medium text-gray-500 mb-1'
@@ -20,7 +22,7 @@ function UserFormDialog({
   const [open, setOpen] = useState(false)
   const [pending, start] = useTransition()
   const [error, setError] = useState('')
-  const blank: UserInput = { firstName: '', lastName: '', email: '', password: '', role: 'MEMBER' }
+  const blank: UserInput = { firstName: '', lastName: '', email: '', password: '', role: 'MEMBER', province: '' }
   const [form, setForm] = useState<UserInput>(blank)
 
   const onOpenChange = (o: boolean) => {
@@ -28,7 +30,7 @@ function UserFormDialog({
     if (o) {
       setError('')
       setForm(mode === 'edit' && user
-        ? { firstName: user.firstName, lastName: user.lastName, email: user.email, password: '', role: user.role }
+        ? { firstName: user.firstName, lastName: user.lastName, email: user.email, password: '', role: user.role, province: user.province ?? '' }
         : blank)
     }
   }
@@ -83,6 +85,18 @@ function UserFormDialog({
               </label>
               <input type="password" autoComplete="new-password" className={field}
                 value={form.password} onChange={set('password')} placeholder={mode === 'edit' ? '••••••' : ''} />
+            </div>
+            <div>
+              <label className={label}>
+                จังหวัดที่สังกัด <span className="font-normal text-gray-400">(ภาคเติมให้อัตโนมัติ)</span>
+              </label>
+              <select className={field} value={form.province ?? ''} onChange={set('province')}>
+                <option value="">ไม่ระบุสังกัด</option>
+                {PROVINCES.map((p) => <option key={p} value={p}>{p}</option>)}
+              </select>
+              {form.province && (
+                <p className="mt-1 text-[11px] text-gray-400">ภาค: {PROVINCE_ZONE[form.province] ?? 'ไม่ทราบ'}</p>
+              )}
             </div>
             <div>
               <label className={label}>สิทธิ์</label>

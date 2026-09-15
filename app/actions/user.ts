@@ -2,6 +2,7 @@
 
 import { prisma } from '@/app/lib/prisma'
 import { requireAdmin, requireSuperAdmin } from '@/app/lib/auth'
+import { PROVINCE_ZONE } from '@/app/lib/province-zone'
 import { revalidatePath } from 'next/cache'
 import bcrypt from 'bcrypt'
 
@@ -14,6 +15,15 @@ export interface UserInput {
   email: string
   password?: string // create: จำเป็น · edit: เว้นว่าง = ไม่เปลี่ยน
   role: RoleValue
+  /** จังหวัดที่สังกัด — ภาคถูก derive จากจังหวัดให้อัตโนมัติ ไม่ต้องกรอกแยก */
+  province?: string
+}
+
+// สังกัด: เก็บจังหวัด แล้วเติมภาคจาก PROVINCE_ZONE ให้ตรงกันเสมอ (เว้นว่าง = ไม่ระบุสังกัด)
+function areaOf(province?: string) {
+  const p = province?.trim()
+  if (!p) return { province: null, zone: null }
+  return { province: p, zone: PROVINCE_ZONE[p] ?? null }
 }
 
 // เปลี่ยนสิทธิ์ผู้ใช้ — SUPERADMIN แก้ได้ทุกคน (ยกเว้นตนเอง)
@@ -58,6 +68,7 @@ export async function createUser(data: UserInput): Promise<{ error?: string }> {
       email,
       password: bcrypt.hashSync(data.password!, 10),
       role: data.role,
+      ...areaOf(data.province),
     },
   })
   revalidatePath('/dashboard/users')
@@ -84,9 +95,43 @@ export async function updateUser(userId: number, data: UserInput): Promise<{ err
       lastName: data.lastName.trim(),
       email,
       role: data.role,
+      ...areaOf(data.province),
       ...(data.password ? { password: bcrypt.hashSync(data.password, 10) } : {}),
     },
   })
+  revalidatePath('/dashboard/users')
+  return {}
+}
+
+export interface MyProfileInput {
+  firstName: string
+  lastName: string
+  tambon?: string
+  amphoe?: string
+  province?: string
+}
+
+// แก้ข้อมูลส่วนตัวของตนเอง — ผู้ใช้ทุกคนที่เข้าแดชบอร์ดได้ แก้ได้เฉพาะ record ของตัวเอง
+// (ไม่มี role/email/password ในชุดนี้โดยตั้งใจ — สิทธิ์ต้องให้ SUPERADMIN ตั้ง, อีเมล/รหัสผ่านใช้ flow แยก)
+export async function updateMyProfile(data: MyProfileInput): Promise<{ error?: string }> {
+  const session = await requireAdmin()
+  if (!data.firstName?.trim() || !data.lastName?.trim()) return { error: 'กรุณากรอกชื่อและนามสกุล' }
+
+  const province = data.province?.trim()
+  await prisma.user.update({
+    where: { id: session.user.id },
+    data: {
+      firstName: data.firstName.trim(),
+      lastName: data.lastName.trim(),
+      // เลือกตำบลด้วย TambonPicker ตัวเดียวกับในแบบสอบถาม → ได้ ตำบล/อำเภอ/จังหวัด พร้อมกัน
+      // ล้างตำบลก็ล้างทั้งชุด ไม่ให้เหลือพื้นที่ครึ่ง ๆ กลาง ๆ
+      district: province ? (data.tambon?.trim() || null) : null,
+      amphoe: province ? (data.amphoe?.trim() || null) : null,
+      ...areaOf(province),
+    },
+  })
+
+  revalidatePath('/dashboard/profile')
   revalidatePath('/dashboard/users')
   return {}
 }

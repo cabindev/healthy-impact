@@ -98,6 +98,13 @@ User, Survey, SurveyTobacco, SurveyAlcohol
 - **หน้าโปรไฟล์** `app/dashboard/profile/page.tsx` — การ์ดบัญชี (avatar/สิทธิ์/วันเข้าร่วม/ขอบเขตการลบ), stat 6 ใบ (บันทึกทั้งหมด/เข้าเกณฑ์/ตรวจสอบแล้ว/30 วัน/พื้นที่/ล่าสุด), BarList แยกตามสถานที่·ความเสี่ยง·พื้นที่, รายการ 10 ใบล่าสุดกดเข้าตรวจสอบได้ (query `where: { creatorId: meId }`); เข้าจากบล็อกชื่อผู้ใช้ท้าย Sidebar
 - **หมายเหตุ:** `updateSurvey`/`verifySurvey` ยังเปิดให้ ADMIN ทุกคน (ตั้งใจ — ให้ตรวจงานข้ามกันได้)
 
+## 👥 หน้าผู้ใช้งาน — สังกัด + ภาระงาน
+- คอลัมน์ **สังกัด** (จังหวัด · ภาค) และ **จำนวนงาน** (`_count.surveys` ผ่าน `Survey.creatorId`)
+- **สังกัดตั้งจาก dialog แก้ไขผู้ใช้** (เฉพาะ SUPERADMIN): เลือกจังหวัดอย่างเดียว แล้ว `areaOf()` ใน `app/actions/user.ts` เติม `zone` จาก `PROVINCE_ZONE` ให้เอง — ฟอร์มสมัครสมาชิกไม่เคยเก็บค่านี้ (ฟิลด์มีใน schema แต่ส่งค่าว่างมาตลอด)
+- **แก้ข้อมูลตัวเองที่หน้าโปรไฟล์**: `profile/ProfileEditDialog.tsx` → action `updateMyProfile()` (แก้ได้เฉพาะ record ตัวเอง; ไม่มี role/email/password ในชุดนี้). ใช้ `TambonPicker` ตัวเดียวกับแบบสอบถาม → เก็บ ตำบล = `User.district` · `amphoe` · `province` แล้ว derive `zone`
+  - หลังบันทึกต้องเรียก `useSession().update()` และ `authOptions.jwt` รองรับ `trigger === 'update'` — ไม่งั้นชื่อบน sidebar/topnav ค้างของเดิมจนกว่าจะ login ใหม่ (JWT ไม่ได้อ่าน DB ซ้ำทุก request)
+- **⚠️ จำนวนงานนับได้เฉพาะรายการที่บันทึกหลังมี `creatorId`** (commit 733c8be) — ข้อมูลเก่าบน production มี `creatorId = null` จึงยังไม่ถูกนับให้ใคร
+
 ## ✅ เกณฑ์คัดเข้า (eligible) — ให้เจ้าหน้าที่เห็นเหตุผล
 นิยามเกณฑ์อยู่ที่เดียว: `app/lib/eligibility.ts` (`ELIGIBILITY_RULES` · `classifyIneligible()` · `tallyIneligible()`)
 - ต้องผ่านครบ 3 ข้อจึงสัมภาษณ์ต่อ: 1.6 พักอาศัย > 6 เดือน · 1.11 อายุ ≥ 15 · 1.7 ยินยอม PDPA

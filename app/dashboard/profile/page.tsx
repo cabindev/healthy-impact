@@ -5,6 +5,7 @@ import authOptions from '@/app/lib/configs/auth/authOptions'
 import { prisma } from '@/app/lib/prisma'
 import { RISK_COLORS, type RiskLevel } from '@/app/lib/audit'
 import { CheckCircle2, ClipboardList, MapPin, Plus, ShieldCheck, Trash2 } from 'lucide-react'
+import ProfileEditDialog from './ProfileEditDialog'
 
 export const dynamic = 'force-dynamic'
 
@@ -68,7 +69,10 @@ export default async function ProfilePage() {
   const [me, mine] = await Promise.all([
     prisma.user.findUnique({
       where: { id: meId },
-      select: { firstName: true, lastName: true, email: true, role: true, createdAt: true, province: true, amphoe: true, zone: true },
+      select: {
+        firstName: true, lastName: true, email: true, role: true, createdAt: true,
+        province: true, amphoe: true, district: true, zone: true,
+      },
     }),
     prisma.survey.findMany({
       where: { creatorId: meId },
@@ -125,17 +129,28 @@ export default async function ProfilePage() {
                 <ShieldCheck className="w-3 h-3" /> {ROLE_LABEL[me.role] ?? me.role}
               </span>
               <span className="text-xs text-gray-400">เข้าร่วมเมื่อ {fmtDate(me.createdAt)}</span>
-              {(me.province || me.amphoe) && (
-                <span className="inline-flex items-center gap-1 text-xs text-gray-400">
-                  <MapPin className="w-3 h-3" /> {[me.amphoe, me.province].filter(Boolean).join(' · ')}
-                </span>
-              )}
+              <span className="inline-flex items-center gap-1 text-xs text-gray-400">
+                <MapPin className="w-3 h-3" />
+                {me.province
+                  ? [me.district && `ต.${me.district}`, me.amphoe && `อ.${me.amphoe}`, `จ.${me.province}`, me.zone && `ภาค${me.zone}`]
+                      .filter(Boolean).join(' · ')
+                  : 'ยังไม่ระบุพื้นที่ที่รับผิดชอบ'}
+              </span>
             </div>
           </div>
-          <Link href="/dashboard/surveys/new"
-            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 transition-colors shrink-0">
-            <Plus className="w-4 h-4" /> เพิ่มแบบสอบถาม
-          </Link>
+          <div className="flex items-center gap-2 shrink-0">
+            <ProfileEditDialog profile={{
+              firstName: me.firstName,
+              lastName: me.lastName,
+              tambon: me.district ?? '',
+              amphoe: me.amphoe ?? '',
+              province: me.province ?? '',
+            }} />
+            <Link href="/dashboard/surveys/new"
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 transition-colors">
+              <Plus className="w-4 h-4" /> เพิ่มแบบสอบถาม
+            </Link>
+          </div>
         </div>
 
         {/* สิทธิ์การลบ — บอกให้ชัดว่าลบอะไรได้บ้าง */}

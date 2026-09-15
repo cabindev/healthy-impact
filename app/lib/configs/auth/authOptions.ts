@@ -110,7 +110,18 @@ const authOptions: NextAuthOptions = {
     },
   },
   callbacks: {
-    jwt: async ({ token, user }) => {
+    jwt: async ({ token, user, trigger, session }) => {
+      // เรียกจาก useSession().update() หลังผู้ใช้แก้โปรไฟล์ตัวเอง — ไม่งั้นชื่อบน sidebar
+      // จะค้างของเดิมจนกว่าจะ login ใหม่ (JWT ไม่ได้อ่าน DB ซ้ำทุก request)
+      if (trigger === 'update' && session) {
+        const s = session as Record<string, unknown>;
+        if (typeof s.firstName === 'string') token.firstName = s.firstName;
+        if (typeof s.lastName === 'string') token.lastName = s.lastName;
+        if (typeof s.province === 'string' || s.province === null) token.province = (s.province as string) ?? undefined;
+        if (typeof s.amphoe === 'string' || s.amphoe === null) token.amphoe = (s.amphoe as string) ?? undefined;
+        if (typeof s.zone === 'string' || s.zone === null) token.zone = (s.zone as string) ?? undefined;
+        return token;
+      }
       if (user) {
         token.id = (user as PrismaUser).id;
         token.firstName = (user as PrismaUser).firstName;
