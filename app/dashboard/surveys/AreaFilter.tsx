@@ -2,8 +2,10 @@
 
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { useMemo } from 'react'
-import { MapPin, MapPinOff, X } from 'lucide-react'
+import { MapPin, MapPinOff, UserRound, X } from 'lucide-react'
 import { PROVINCE_ZONE } from '@/app/lib/province-zone'
+
+export type AdminOption = { id: number; name: string; count: number }
 
 export type GeoCombo = { province: string | null; amphoe: string | null; tambon: string | null; villageName: string | null }
 
@@ -17,7 +19,7 @@ function uniqSorted(values: (string | null | undefined)[]) {
 }
 
 // ตัวกรองพื้นที่แบบไล่ระดับ: โซน → จังหวัด → อำเภอ → ตำบล → หมู่บ้าน — สร้างตัวเลือกจากข้อมูลที่มีอยู่จริงในระบบ
-export default function AreaFilter({ combos }: { combos: GeoCombo[] }) {
+export default function AreaFilter({ combos, admins = [] }: { combos: GeoCombo[]; admins?: AdminOption[] }) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -30,7 +32,8 @@ export default function AreaFilter({ combos }: { combos: GeoCombo[] }) {
     village: searchParams.get('village') ?? '',
   }
   const noArea = searchParams.get('noArea') === '1'
-  const active = LEVELS.some((l) => current[l]) || noArea
+  const creator = searchParams.get('creator') ?? ''
+  const active = LEVELS.some((l) => current[l]) || noArea || !!creator
 
   // เลือกดู "ไม่ระบุพื้นที่" แล้วตัวกรองไล่ระดับใช้ไม่ได้ (ไม่มีค่าให้กรอง) — ล้างทิ้งพร้อมกัน
   const toggleNoArea = () => {
@@ -67,10 +70,19 @@ export default function AreaFilter({ combos }: { combos: GeoCombo[] }) {
     router.replace(qs ? `${pathname}?${qs}` : pathname)
   }
 
+  const changeCreator = (value: string) => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (value) params.set('creator', value)
+    else params.delete('creator')
+    const qs = params.toString()
+    router.replace(qs ? `${pathname}?${qs}` : pathname)
+  }
+
   const clearAll = () => {
     const params = new URLSearchParams(searchParams.toString())
     LEVELS.forEach((l) => params.delete(l))
     params.delete('noArea')
+    params.delete('creator')
     const qs = params.toString()
     router.replace(qs ? `${pathname}?${qs}` : pathname)
   }
@@ -99,6 +111,23 @@ export default function AreaFilter({ combos }: { combos: GeoCombo[] }) {
         }`}>
         <MapPinOff className="w-3.5 h-3.5" /> ไม่ระบุพื้นที่
       </button>
+      {admins.length > 0 && (
+        <label className="inline-flex items-center gap-1.5">
+          <UserRound className="w-3.5 h-3.5 text-gray-400" aria-hidden />
+          <span className="sr-only">กรองตาม admin ผู้บันทึก</span>
+          <select
+            value={creator}
+            onChange={(e) => changeCreator(e.target.value)}
+            className={`px-2.5 py-1.5 border rounded-lg text-xs bg-white focus:outline-none focus:border-green-500 ${
+              creator ? 'border-green-300 text-green-700 font-medium' : 'border-gray-200 text-gray-700'
+            }`}>
+            <option value="">adminทั้งหมด</option>
+            {admins.map((a) => (
+              <option key={a.id} value={a.id}>{a.name} ({a.count.toLocaleString()})</option>
+            ))}
+          </select>
+        </label>
+      )}
       {active && (
         <button type="button" onClick={clearAll}
           className="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-red-500 px-1.5 py-1.5">

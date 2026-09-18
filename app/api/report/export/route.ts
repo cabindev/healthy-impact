@@ -18,7 +18,7 @@ export async function GET(req: Request) {
     : null
 
   // ไม่มี ids → export ตามตัวกรอง/คำค้นที่ส่งมาจากหน้ารายการ (ให้ตรงกับที่เห็นบนจอ)
-  const filtered = ['q', 'zone', 'province', 'amphoe', 'tambon', 'village', 'noArea'].some((k) => params.get(k))
+  const filtered = ['q', 'zone', 'province', 'amphoe', 'tambon', 'village', 'noArea', 'creator'].some((k) => params.get(k))
   const where = ids && ids.length
     ? { id: { in: ids } }
     : buildSurveyWhere({
@@ -29,6 +29,7 @@ export async function GET(req: Request) {
         tambon: params.get('tambon'),
         village: params.get('village'),
         noArea: params.get('noArea') === '1',
+        creator: params.get('creator'),
       })
 
   const surveys = await prisma.survey.findMany({

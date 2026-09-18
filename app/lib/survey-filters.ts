@@ -10,6 +10,8 @@ export type SurveyFilterParams = {
   village?: string | null
   /** เฉพาะรายการที่ยังไม่ระบุจังหวัด — ใช้ไล่เก็บข้อมูลเก่าที่บันทึกไว้ก่อนบังคับกรอกพื้นที่ */
   noArea?: boolean
+  /** User.id ของผู้บันทึก (Survey.creatorId) */
+  creator?: string | null
 }
 
 // ใช้ร่วมกันระหว่างหน้ารายการแบบสอบถาม (SurveysPage) และ export excel เพื่อให้ export ตรงกับตัวกรองที่เห็นบนจอเสมอ
@@ -46,6 +48,8 @@ export function buildSurveyWhere(params: SurveyFilterParams): Prisma.SurveyWhere
   if (amphoe) and.push({ amphoe })
   if (tambon) and.push({ tambon })
   if (village) and.push({ villageName: village })
+  const creatorId = Number(params.creator)
+  if (Number.isInteger(creatorId) && creatorId > 0) and.push({ creatorId })
   if (params.noArea) and.push({ OR: [{ province: null }, { province: '' }] })
 
   return and.length ? { AND: and } : {}
