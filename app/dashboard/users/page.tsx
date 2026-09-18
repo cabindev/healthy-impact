@@ -42,11 +42,7 @@ export default async function UsersPage() {
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-gray-800">ผู้ใช้งาน</h1>
-          <p className="text-sm text-gray-400 mt-0.5">
-            {isSuperAdmin
-              ? 'เพิ่ม/แก้ไข/ลบ และเปลี่ยนสิทธิ์ผู้ใช้งานได้'
-              : 'เปลี่ยนสิทธิ์ผู้ใช้งานระดับ MEMBER ได้ (เพิ่ม/แก้ไข/ลบผู้ใช้ และตั้งเป็น SUPERADMIN เฉพาะ SUPERADMIN เท่านั้น)'}
-          </p>
+          {isSuperAdmin && <p className="text-sm text-gray-400 mt-0.5">เพิ่ม/แก้ไข/ลบ และเปลี่ยนสิทธิ์ผู้ใช้งานได้</p>}
         </div>
         {isSuperAdmin && <AddUserButton />}
       </div>
