@@ -32,7 +32,10 @@ export default async function SurveysPage({ searchParams }: { searchParams: Prom
     prisma.survey.findMany({
       where,
       orderBy: { createdAt: 'desc' },
-      include: { alcohol: { select: { auditScore: true, riskLevel: true } } },
+      include: {
+        alcohol: { select: { auditScore: true, riskLevel: true } },
+        creator: { select: { firstName: true, lastName: true } },
+      },
       take: 100,
     }),
     prisma.survey.findMany({
@@ -56,6 +59,8 @@ export default async function SurveysPage({ searchParams }: { searchParams: Prom
     eligible: s.eligible,
     reason: s.ineligibleReason,
     verified: !!s.verifiedAt,
+    recorder: s.creator ? `${s.creator.firstName} ${s.creator.lastName}`.trim() : null,
+    collector: s.collectorName,
     canDelete: canManageSurvey(session?.user, s.creatorId),
   }))
 

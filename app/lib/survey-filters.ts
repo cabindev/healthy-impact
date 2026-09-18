@@ -33,6 +33,8 @@ export function buildSurveyWhere(params: SurveyFilterParams): Prisma.SurveyWhere
         { amphoe: { contains: q } },
         { province: { contains: q } },
         { collectorName: { contains: q } },
+        { creator: { firstName: { contains: q } } },
+        { creator: { lastName: { contains: q } } },
       ],
     })
   }

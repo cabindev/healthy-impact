@@ -22,6 +22,10 @@ export type SurveyRow = {
   /** เหตุที่ถูกคัดออก (เฉพาะ eligible = false) */
   reason: string | null
   verified: boolean
+  /** ชื่อผู้ใช้ที่บันทึกเข้าระบบ (Survey.creator) — ข้อมูลเก่าก่อนมี creatorId เป็น null */
+  recorder: string | null
+  /** ผู้เก็บข้อมูลที่กรอกในฟอร์ม (อาจเป็นคนละคนกับผู้บันทึก) */
+  collector: string | null
   canDelete: boolean
 }
 
@@ -94,6 +98,7 @@ export default function SurveyTable({ rows, q, filterQuery = '' }: { rows: Surve
               <th className="text-left font-medium px-4 py-3">ผู้ตอบ</th>
               <th className="text-left font-medium px-4 py-3">สถานที่</th>
               <th className="text-left font-medium px-4 py-3">พื้นที่</th>
+              <th className="text-left font-medium px-4 py-3">ผู้บันทึกข้อมูล</th>
               <th className="text-right font-medium px-4 py-3">AUDIT</th>
               <th className="text-left font-medium px-4 py-3"><span className="inline-flex items-center gap-1">ความเสี่ยง <AuditTip align="center" /></span></th>
               <th className="px-4 py-3"></th>
@@ -101,7 +106,7 @@ export default function SurveyTable({ rows, q, filterQuery = '' }: { rows: Surve
           </thead>
           <tbody className="divide-y divide-gray-100">
             {rows.length === 0 ? (
-              <tr><td colSpan={9} className="px-4 py-12 text-center text-gray-400">
+              <tr><td colSpan={10} className="px-4 py-12 text-center text-gray-400">
                 {q ? `ไม่พบแบบสอบถามที่ตรงกับ “${q}”` : 'ยังไม่มีแบบสอบถาม — กด “เพิ่มแบบสอบถาม” เพื่อเริ่ม'}
               </td></tr>
             ) : rows.map((r, i) => {
@@ -135,6 +140,14 @@ export default function SurveyTable({ rows, q, filterQuery = '' }: { rows: Surve
                     {r.area === '—'
                       ? <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-50 text-amber-600 font-medium">ไม่ระบุพื้นที่</span>
                       : <span className="text-gray-500">{r.area}</span>}
+                  </td>
+                  <td className="px-4 py-3">
+                    {r.recorder
+                      ? <span className="inline-flex flex-col gap-0.5">
+                          <span className="text-gray-700">{r.recorder}</span>
+                          {r.collector && r.collector !== r.recorder && <span className="text-[11px] text-gray-400">เก็บโดย {r.collector}</span>}
+                        </span>
+                      : <span className="text-gray-400" title="บันทึกก่อนระบบเริ่มเก็บชื่อผู้บันทึก">{r.collector ? `เก็บโดย ${r.collector}` : '—'}</span>}
                   </td>
                   <td className="px-4 py-3 text-right text-gray-700 tabular-nums">{r.audit ?? '—'}</td>
                   <td className="px-4 py-3">
