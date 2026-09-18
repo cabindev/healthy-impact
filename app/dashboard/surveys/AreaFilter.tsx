@@ -41,6 +41,7 @@ export default function AreaFilter({ combos, admins = [] }: { combos: GeoCombo[]
     LEVELS.forEach((l) => params.delete(l))
     if (noArea) params.delete('noArea')
     else params.set('noArea', '1')
+    params.delete('page')
     const qs = params.toString()
     router.replace(qs ? `${pathname}?${qs}` : pathname)
   }
@@ -66,6 +67,7 @@ export default function AreaFilter({ combos, admins = [] }: { combos: GeoCombo[]
     const clearFrom = LEVELS.indexOf(level)
     LEVELS.slice(clearFrom).forEach((l) => params.delete(l))
     if (value) params.set(level, value)
+    params.delete('page')
     const qs = params.toString()
     router.replace(qs ? `${pathname}?${qs}` : pathname)
   }
@@ -74,6 +76,7 @@ export default function AreaFilter({ combos, admins = [] }: { combos: GeoCombo[]
     const params = new URLSearchParams(searchParams.toString())
     if (value) params.set('creator', value)
     else params.delete('creator')
+    params.delete('page')
     const qs = params.toString()
     router.replace(qs ? `${pathname}?${qs}` : pathname)
   }
@@ -83,6 +86,7 @@ export default function AreaFilter({ combos, admins = [] }: { combos: GeoCombo[]
     LEVELS.forEach((l) => params.delete(l))
     params.delete('noArea')
     params.delete('creator')
+    params.delete('page')
     const qs = params.toString()
     router.replace(qs ? `${pathname}?${qs}` : pathname)
   }

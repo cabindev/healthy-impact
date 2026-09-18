@@ -7,13 +7,16 @@ import { Plus } from 'lucide-react'
 import SearchBox from './SearchBox'
 import AreaFilter, { type GeoCombo, type AdminOption } from './AreaFilter'
 import SurveyTable, { type SurveyRow } from './SurveyTable'
+import Pagination from './Pagination'
 import { buildSurveyWhere } from '@/app/lib/survey-filters'
 
 export const dynamic = 'force-dynamic'
 
+const PAGE_SIZE = 50
+
 const SITE_LABEL: Record<string, string> = { VILLAGE: 'หมู่บ้าน', WORKPLACE: 'สถานประกอบการ', SCHOOL: 'สถานศึกษา' }
 
-type SurveysSearchParams = { q?: string; zone?: string; province?: string; amphoe?: string; tambon?: string; village?: string; noArea?: string; creator?: string }
+type SurveysSearchParams = { q?: string; zone?: string; province?: string; amphoe?: string; tambon?: string; village?: string; noArea?: string; creator?: string; page?: string }
 
 export default async function SurveysPage({ searchParams }: { searchParams: Promise<SurveysSearchParams> }) {
   const sp = await searchParams
@@ -25,9 +28,16 @@ export default async function SurveysPage({ searchParams }: { searchParams: Prom
   const village = sp.village?.trim() ?? ''
   const noArea = sp.noArea === '1'
   const creator = sp.creator?.trim() ?? ''
+  const requestedPage = Math.max(1, Math.floor(Number(sp.page)) || 1)
 
   const where = buildSurveyWhere({ q, zone, province, amphoe, tambon, village, noArea, creator })
   const session = await getServerSession(authOptions)
+
+  // นับก่อนเพื่อ clamp หน้า — กันกรณีลิงก์เก่าชี้ไปหน้าที่เกินจำนวนจริง (เช่น หลังลบรายการ)
+  const total = await prisma.survey.count({ where })
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const page = Math.min(requestedPage, pageCount)
+  const offset = (page - 1) * PAGE_SIZE
 
   const [surveys, geoCombos, recorders] = await Promise.all([
     prisma.survey.findMany({
@@ -37,7 +47,8 @@ export default async function SurveysPage({ searchParams }: { searchParams: Prom
         alcohol: { select: { auditScore: true, riskLevel: true } },
         creator: { select: { firstName: true, lastName: true } },
       },
-      take: 100,
+      skip: offset,
+      take: PAGE_SIZE,
     }),
     prisma.survey.findMany({
       select: { province: true, amphoe: true, tambon: true, villageName: true },
@@ -93,8 +104,8 @@ export default async function SurveysPage({ searchParams }: { searchParams: Prom
         <div>
           <h1 className="text-xl font-semibold text-gray-800">แบบสอบถาม</h1>
           <p className="text-sm text-gray-400 mt-0.5">
-            {filtered ? `พบ ${rows.length.toLocaleString()} รายการ` : `ทั้งหมด ${rows.length.toLocaleString()} รายการ`}
-            {rows.length === 100 && <span className="text-gray-300"> · แสดง 100 รายการแรก</span>}
+            {filtered ? `พบ ${total.toLocaleString()} รายการ` : `ทั้งหมด ${total.toLocaleString()} รายการ`}
+            {pageCount > 1 && <span className="text-gray-300"> · แสดง {(offset + 1).toLocaleString()}–{(offset + rows.length).toLocaleString()}</span>}
           </p>
         </div>
         <Link href="/dashboard/surveys/new"
@@ -119,7 +130,9 @@ export default async function SurveysPage({ searchParams }: { searchParams: Prom
         <SearchBox initial={q} />
         <AreaFilter combos={combos} admins={admins} />
       </div>
-      <SurveyTable rows={rows} q={q} filterQuery={filterQuery} />
+      {/* key ตามหน้า — เปลี่ยนหน้าแล้วล้างรายการที่ติ๊กไว้ (ไม่ให้เลือกค้างข้ามหน้าโดยมองไม่เห็น) */}
+      <SurveyTable key={page} rows={rows} q={q} filterQuery={filterQuery} offset={offset} />
+      <Pagination page={page} pageCount={pageCount} params={filterQuery} />
     </div>
   )
 }

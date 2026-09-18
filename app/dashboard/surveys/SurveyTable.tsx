@@ -27,7 +27,7 @@ export type SurveyRow = {
   canDelete: boolean
 }
 
-export default function SurveyTable({ rows, q, filterQuery = '' }: { rows: SurveyRow[]; q: string; filterQuery?: string }) {
+export default function SurveyTable({ rows, q, filterQuery = '', offset = 0 }: { rows: SurveyRow[]; q: string; filterQuery?: string; offset?: number }) {
   const router = useRouter()
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const [deletingId, setDeletingId] = useState<number | null>(null)
@@ -118,7 +118,7 @@ export default function SurveyTable({ rows, q, filterQuery = '' }: { rows: Surve
                         aria-label={`เลือก ${r.no}`} className="accent-green-600 w-4 h-4" />
                     </label>
                   </td>
-                  <td className="px-4 py-3 text-right text-gray-400 tabular-nums">{i + 1}</td>
+                  <td className="px-4 py-3 text-right text-gray-400 tabular-nums">{offset + i + 1}</td>
                   <td className="px-4 py-3 text-gray-500">
                     <span className="inline-flex items-center gap-1.5">
                       {r.no}

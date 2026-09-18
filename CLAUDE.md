@@ -145,8 +145,12 @@ choropleth ความเข้มข้นการเก็บข้อมู
 ## 🎨 impeccable (design context)
 ติดตั้ง impeccable skills v3.5.0 ใน `.claude/skills/` + รัน init/document → มี `PRODUCT.md`, `DESIGN.md`, `.impeccable/design.json` (อ่านก่อนทำงาน UI). North Star: "สมุดบันทึกภาคสนาม" · register `product`
 
+## 📄 รายการแบบสอบถาม — แบ่งหน้า
+- หน้าละ 50 (`PAGE_SIZE` ใน `surveys/page.tsx`) ผ่าน `?page=` + `Pagination.tsx` (server, ลิงก์คงตัวกรองเดิม); หน้าเกินจำนวนจริงถูก clamp
+- เปลี่ยนคำค้น/ตัวกรอง (`SearchBox`/`AreaFilter`) ต้อง `params.delete('page')` กลับหน้า 1; Export ไม่สนหน้า (ทั้งชุดที่กรอง)
+- `SurveyTable key={page}` → เปลี่ยนหน้าแล้วล้างรายการที่ติ๊กไว้
+
 ## ยังไม่ได้ทำ (next steps)
-- ค้นหา/กรอง/แบ่งหน้า ในรายการแบบสอบถาม (ตอนนี้ `take: 100`)
 - กรองช่วงเวลา/พื้นที่ ก่อน export
 
 ## AUDIT scoring

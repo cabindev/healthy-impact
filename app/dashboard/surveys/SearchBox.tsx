@@ -18,6 +18,7 @@ export default function SearchBox({ initial = '' }: { initial?: string }) {
       const q = value.trim()
       const params = new URLSearchParams(searchParams.toString())
       q ? params.set('q', q) : params.delete('q')
+      params.delete('page')
       const qs = params.toString()
       router.replace(qs ? `${pathname}?${qs}` : pathname)
     }, 300)
