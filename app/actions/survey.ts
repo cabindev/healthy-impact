@@ -1,7 +1,8 @@
 'use server'
 
 import { prisma } from '@/app/lib/prisma'
-import { requireAdmin, canManageSurvey } from '@/app/lib/auth'
+import { requireAdmin, requireSuperAdmin, canManageSurvey } from '@/app/lib/auth'
+import { buildSurveyWhere, type SurveyFilterParams } from '@/app/lib/survey-filters'
 import { evaluateAudit } from '@/app/lib/audit'
 import { labeledSurvey, SURVEY_INCLUDE } from '@/app/lib/survey-export'
 import { revalidatePath } from 'next/cache'
@@ -338,6 +339,33 @@ export async function setSurveyArea(
   revalidatePath('/dashboard/surveys')
   revalidatePath('/dashboard')
   revalidatePath('/dashboard/map')
+  return { ok: true, updated: count }
+}
+
+// กำหนดผู้บันทึกย้อนหลังให้ทุกรายการในตัวกรอง — ข้อมูลก่อนมี creatorId (ก่อน 12 ก.ย. 2569) ไม่รู้ว่าใครลง
+// SUPERADMIN เท่านั้น เพราะผู้บันทึกได้สิทธิ์ลบใบนั้นด้วย (canManageSurvey); แตะเฉพาะใบที่ creatorId = null ไม่เขียนทับของเดิม
+export async function assignSurveyCreator(
+  filter: SurveyFilterParams,
+  userId: number,
+): Promise<{ ok: true; updated: number } | { ok: false; error: string }> {
+  await requireSuperAdmin()
+
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } })
+  if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPERADMIN')) {
+    return { ok: false, error: 'ผู้ใช้นี้ไม่ใช่ admin' }
+  }
+
+  const where = buildSurveyWhere(filter)
+  if (Object.keys(where).length === 0) return { ok: false, error: 'ต้องกรองรายการก่อน (เช่น เลือกจังหวัด)' }
+
+  const { count } = await prisma.survey.updateMany({
+    where: { AND: [where, { creatorId: null }] },
+    data: { creatorId: userId },
+  })
+
+  revalidatePath('/dashboard/surveys')
+  revalidatePath('/dashboard/users')
+  revalidatePath('/dashboard/profile')
   return { ok: true, updated: count }
 }
 

@@ -8,6 +8,7 @@ import SearchBox from './SearchBox'
 import AreaFilter, { type GeoCombo, type AdminOption } from './AreaFilter'
 import SurveyTable, { type SurveyRow } from './SurveyTable'
 import Pagination from './Pagination'
+import AssignCreatorDialog, { type AdminChoice } from './AssignCreatorDialog'
 import { buildSurveyWhere } from '@/app/lib/survey-filters'
 
 export const dynamic = 'force-dynamic'
@@ -87,6 +88,30 @@ export default async function SurveysPage({ searchParams }: { searchParams: Prom
   }))
 
   const filtered = !!(q || zone || province || amphoe || tambon || village || noArea || creator)
+
+  // SUPERADMIN: กำหนดผู้บันทึกย้อนหลังให้ข้อมูลเก่า — ต้องกรองก่อนเสมอ กันเผลอยกทั้งระบบให้คนเดียว
+  const isSuperAdmin = session?.user?.role === 'SUPERADMIN'
+  let unattributed = 0
+  let adminChoices: AdminChoice[] = []
+  if (isSuperAdmin && filtered && !creator) {
+    ;[unattributed, adminChoices] = await Promise.all([
+      prisma.survey.count({ where: { AND: [where, { creatorId: null }] } }),
+      prisma.user.findMany({
+        where: { role: { in: ['ADMIN', 'SUPERADMIN'] } },
+        select: { id: true, firstName: true, lastName: true, email: true },
+        orderBy: { firstName: 'asc' },
+      }).then((us) => us.map((u) => ({ id: u.id, name: `${u.firstName} ${u.lastName}`.trim(), email: u.email }))),
+    ])
+  }
+  const filterLabel = [
+    q && `คำค้น “${q}”`,
+    zone && `ภาค${zone}`,
+    province && `จังหวัด${province}`,
+    amphoe && `อำเภอ${amphoe}`,
+    tambon && `ตำบล${tambon}`,
+    village && `หมู่บ้าน${village}`,
+    noArea && 'ไม่ระบุพื้นที่',
+  ].filter(Boolean).join(' · ')
   const filterQuery = new URLSearchParams({
     ...(q ? { q } : {}),
     ...(zone ? { zone } : {}),
@@ -130,6 +155,20 @@ export default async function SurveysPage({ searchParams }: { searchParams: Prom
         <SearchBox initial={q} />
         <AreaFilter combos={combos} admins={admins} />
       </div>
+
+      {unattributed > 0 && (
+        <div className="print:hidden flex flex-wrap items-center justify-between gap-3 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3">
+          <p className="text-sm text-slate-700">
+            <b className="tabular-nums">{unattributed.toLocaleString()}</b> รายการในตัวกรองนี้ยังไม่รู้ว่า admin คนไหนบันทึก (ข้อมูลก่อน 12 ก.ย. 2569)
+          </p>
+          <AssignCreatorDialog
+            filter={{ q, zone, province, amphoe, tambon, village, noArea }}
+            filterLabel={filterLabel}
+            count={unattributed}
+            admins={adminChoices}
+          />
+        </div>
+      )}
       {/* key ตามหน้า — เปลี่ยนหน้าแล้วล้างรายการที่ติ๊กไว้ (ไม่ให้เลือกค้างข้ามหน้าโดยมองไม่เห็น) */}
       <SurveyTable key={page} rows={rows} q={q} filterQuery={filterQuery} offset={offset} />
       <Pagination page={page} pageCount={pageCount} params={filterQuery} />
