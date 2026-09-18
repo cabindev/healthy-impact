@@ -60,7 +60,6 @@ export default async function SurveysPage({ searchParams }: { searchParams: Prom
     reason: s.ineligibleReason,
     verified: !!s.verifiedAt,
     recorder: s.creator ? `${s.creator.firstName} ${s.creator.lastName}`.trim() : null,
-    collector: s.collectorName,
     canDelete: canManageSurvey(session?.user, s.creatorId),
   }))
 

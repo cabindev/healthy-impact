@@ -24,8 +24,6 @@ export type SurveyRow = {
   verified: boolean
   /** ชื่อผู้ใช้ที่บันทึกเข้าระบบ (Survey.creator) — ข้อมูลเก่าก่อนมี creatorId เป็น null */
   recorder: string | null
-  /** ผู้เก็บข้อมูลที่กรอกในฟอร์ม (อาจเป็นคนละคนกับผู้บันทึก) */
-  collector: string | null
   canDelete: boolean
 }
 
@@ -143,11 +141,8 @@ export default function SurveyTable({ rows, q, filterQuery = '' }: { rows: Surve
                   </td>
                   <td className="px-4 py-3">
                     {r.recorder
-                      ? <span className="inline-flex flex-col gap-0.5">
-                          <span className="text-gray-700">{r.recorder}</span>
-                          {r.collector && r.collector !== r.recorder && <span className="text-[11px] text-gray-400">เก็บโดย {r.collector}</span>}
-                        </span>
-                      : <span className="text-gray-400" title="บันทึกก่อนระบบเริ่มเก็บชื่อผู้บันทึก">{r.collector ? `เก็บโดย ${r.collector}` : '—'}</span>}
+                      ? <span className="text-gray-700">{r.recorder}</span>
+                      : <span className="text-gray-300" title="บันทึกก่อนระบบเริ่มเก็บชื่อผู้บันทึก">—</span>}
                   </td>
                   <td className="px-4 py-3 text-right text-gray-700 tabular-nums">{r.audit ?? '—'}</td>
                   <td className="px-4 py-3">
