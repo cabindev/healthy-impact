@@ -98,7 +98,7 @@ export default function SurveyTable({ rows, q, filterQuery = '' }: { rows: Surve
               <th className="text-left font-medium px-4 py-3">ผู้ตอบ</th>
               <th className="text-left font-medium px-4 py-3">สถานที่</th>
               <th className="text-left font-medium px-4 py-3">พื้นที่</th>
-              <th className="text-left font-medium px-4 py-3">ผู้บันทึกข้อมูล</th>
+              <th className="text-left font-medium px-4 py-3">โดย admin</th>
               <th className="text-right font-medium px-4 py-3">AUDIT</th>
               <th className="text-left font-medium px-4 py-3"><span className="inline-flex items-center gap-1">ความเสี่ยง <AuditTip align="center" /></span></th>
               <th className="px-4 py-3"></th>
