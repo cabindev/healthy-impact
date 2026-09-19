@@ -1,3 +1,4 @@
+import { requireAdminPage } from '@/app/lib/auth'
 import { prisma } from '@/app/lib/prisma'
 import { thaiAge, calcBMI, bmiCategory } from '@/app/lib/health'
 import { DatabaseZap } from 'lucide-react'
@@ -52,6 +53,7 @@ async function loadSurveys() {
 }
 
 export default async function DashboardHome() {
+  await requireAdminPage()
   let surveys: SurveyRows
   try {
     surveys = await loadSurveys()

@@ -1,40 +1,28 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcrypt';
+import { NextResponse } from 'next/server'
+import { createHash } from 'node:crypto'
+import bcrypt from 'bcrypt'
+import { prisma } from '@/app/lib/prisma'
+import { validPassword, validResetToken } from '@/app/lib/security-input'
+import { readJson, requestError, RequestError } from '@/app/lib/security-request'
+import { rateLimit } from '@/app/lib/rate-limit'
 
-const prisma = new PrismaClient();
-
-export async function POST(req: NextRequest) {
+export async function POST(req: Request) {
   try {
-    const { token, password } = await req.json();
-
-    const user = await prisma.user.findFirst({
-      where: {
-        resetToken: token,
-        resetTokenExpiresAt: { gt: new Date() },
-      },
-    });
-
-    if (!user) {
-      return NextResponse.json({ error: 'รหัสยืนยันไม่ถูกต้องหรือหมดอายุแล้ว' }, { status: 400 });
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        password: hashedPassword,
-        resetToken: null,
-        resetTokenCreatedAt: null,
-        resetTokenExpiresAt: null,
-        lastPasswordReset: new Date(),
-      },
-    });
-
-    return NextResponse.json({ message: 'รีเซ็ตรหัสผ่านสำเร็จ' });
-  } catch (error) {
-    console.error('Error resetting password:', error);
-    return NextResponse.json({ error: 'เกิดข้อผิดพลาดในการรีเซ็ตรหัสผ่าน' }, { status: 500 });
-  }
+    await rateLimit('reset-global', 'all', 100, 60_000)
+    const { token, password } = await readJson(req)
+    if (!validResetToken(token)) throw new RequestError('รหัสยืนยันไม่ถูกต้องหรือหมดอายุแล้ว')
+    if (!validPassword(password)) throw new RequestError('รหัสผ่านต้องมีอย่างน้อย 12 ตัวอักษร และไม่เกิน 72 ไบต์')
+    const digest = createHash('sha256').update(token).digest('hex')
+    await rateLimit('reset-token', digest, 5, 900_000)
+    const user = await prisma.user.findFirst({ where: { resetToken: digest, resetTokenExpiresAt: { gt: new Date() } }, select: { id: true } })
+    if (!user) throw new RequestError('รหัสยืนยันไม่ถูกต้องหรือหมดอายุแล้ว')
+    const hash = await bcrypt.hash(password, 12)
+    // Compare-and-swap consumes the token once, including concurrent requests.
+    const { count } = await prisma.user.updateMany({
+      where: { id: user.id, resetToken: digest, resetTokenExpiresAt: { gt: new Date() } },
+      data: { password: hash, resetToken: null, resetTokenCreatedAt: null, resetTokenExpiresAt: null, lastPasswordReset: new Date() },
+    })
+    if (count !== 1) throw new RequestError('รหัสยืนยันไม่ถูกต้องหรือหมดอายุแล้ว')
+    return NextResponse.json({ message: 'รีเซ็ตรหัสผ่านสำเร็จ' }, { headers: { 'Cache-Control': 'no-store' } })
+  } catch (error) { return requestError(error) }
 }

@@ -176,3 +176,12 @@ model SurveyAlcohol {
   auditScore Int?    // คะแนนรวม (คำนวณ)
   riskLevel  String? // ระดับความเสี่ยง (คำนวณ)
 }
+
+// Shared rate limits across workers/servers. Keys are SHA-256 hashes, never raw emails.
+model SecurityRateLimit {
+  key       String   @id @db.VarChar(64)
+  count     Int      @default(0)
+  expiresAt DateTime
+
+  @@index([expiresAt])
+}

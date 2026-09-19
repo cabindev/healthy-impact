@@ -1,6 +1,8 @@
+import { requireAdminPage } from '@/app/lib/auth'
 import dynamicImport from 'next/dynamic'
 import { prisma } from '@/app/lib/prisma'
-import { MapPinned } from 'lucide-react'
+import Link from 'next/link'
+import { ClipboardList, CircleCheck, CheckCheck, MapPinned, Info } from 'lucide-react'
 import type { ProvinceStat } from './MapView'
 
 export const dynamic = 'force-dynamic'
@@ -11,6 +13,7 @@ const MapView = dynamicImport(() => import('./MapView'), {
 })
 
 export default async function MapPage() {
+  await requireAdminPage()
   let rows: { province: string | null; eligible: boolean; verifiedAt: Date | null }[] = []
   let dbError = false
   try {
@@ -36,14 +39,10 @@ export default async function MapPage() {
   const noProvince = rows.length - totalRecords
 
   return (
-    <div className="space-y-4">
+    <div className="mx-auto max-w-7xl space-y-6">
       <div>
-        <h1 className="text-xl font-semibold text-gray-800">แผนที่การขับเคลื่อน</h1>
-        <p className="text-sm text-gray-400 mt-0.5">
-          ความเข้มข้นการเก็บข้อมูลรายจังหวัด · ครอบคลุม {covered} จาก 77 จังหวัด ·
-          {' '}{totalRecords.toLocaleString()} ชิ้นงาน
-          {noProvince > 0 && <span className="text-gray-300"> (ไม่ระบุจังหวัด {noProvince.toLocaleString()})</span>}
-        </p>
+        <h1 className="text-2xl font-semibold tracking-tight text-gray-800">แผนที่การขับเคลื่อน</h1>
+        <p className="mt-1 text-sm text-gray-500">ติดตามความครอบคลุมการเก็บข้อมูล และสำรวจผลการดำเนินงานรายจังหวัด</p>
       </div>
 
       {dbError ? (
@@ -53,7 +52,18 @@ export default async function MapPage() {
           <p className="mt-1 text-xs text-amber-600">ระบบดึงข้อมูลรายจังหวัดมาแสดงบนแผนที่ไม่ได้ กรุณาลองรีเฟรชอีกครั้ง</p>
         </div>
       ) : (
-        <MapView stats={stats} />
+        <>
+          <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+            {[
+              { label: 'จังหวัดที่มีข้อมูล', value: covered, unit: '/ 77 จังหวัด', icon: MapPinned, color: 'bg-green-50 text-green-700' },
+              { label: 'แบบสอบถามบนแผนที่', value: totalRecords, unit: 'รายการ', icon: ClipboardList, color: 'bg-blue-50 text-blue-700' },
+              { label: 'เข้าเกณฑ์', value: stats.reduce((sum, s) => sum + s.eligible, 0), unit: 'รายการ', icon: CircleCheck, color: 'bg-amber-50 text-amber-700' },
+              { label: 'ตรวจสอบแล้ว', value: stats.reduce((sum, s) => sum + s.verified, 0), unit: 'รายการ', icon: CheckCheck, color: 'bg-violet-50 text-violet-700' },
+            ].map(({ label, value, unit, icon: Icon, color }) => <div key={label} className="rounded-2xl border border-gray-200/80 bg-white p-4 sm:p-5"><div className="flex items-center gap-2 text-xs text-gray-500 sm:text-sm"><span className={`rounded-lg p-2 ${color}`}><Icon aria-hidden="true" className="size-4" /></span>{label}</div><p className="mt-3 text-2xl font-semibold tabular-nums text-gray-800">{value.toLocaleString()} <span className="text-xs font-normal text-gray-400">{unit}</span></p></div>)}
+          </div>
+          {noProvince > 0 && <div className="flex items-start gap-2 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3 text-xs leading-relaxed text-amber-800"><Info aria-hidden="true" className="size-4 shrink-0" /><p>มีแบบสอบถามไม่ระบุจังหวัด {noProvince.toLocaleString()} รายการ ซึ่งไม่รวมในสรุปและแผนที่นี้ <Link href="/dashboard/surveys?noArea=1" className="ml-1 font-semibold underline underline-offset-2">ตรวจสอบรายการ</Link></p></div>}
+          <MapView stats={stats} />
+        </>
       )}
     </div>
   )

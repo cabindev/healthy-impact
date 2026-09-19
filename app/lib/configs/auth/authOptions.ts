@@ -1,10 +1,12 @@
 import { NextAuthOptions } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
-import { PrismaClient, User as PrismaUser } from '@prisma/client';
+import { prisma } from '@/app/lib/prisma';
+import { rateLimit } from '@/app/lib/rate-limit';
+import { normalizedEmail, escapeHtml } from '@/app/lib/security-input';
 import bcrypt from 'bcrypt';
 import { sendTelegram } from '@/app/lib/telegram';
 
-const prisma = new PrismaClient();
+
 
 interface Credentials {
   email: string;
@@ -30,12 +32,15 @@ declare module 'next-auth' {
   interface User {
     id: number;
     role: string;
+    sessionVersion: number;
   }
 }
 
 declare module 'next-auth/jwt' {
   interface JWT {
     id: number;
+    sessionVersion?: number;
+    invalid?: boolean;
     firstName: string;
     lastName: string;
     role: string;
@@ -56,32 +61,27 @@ const authOptions: NextAuthOptions = {
         password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials: Credentials | undefined) {
-        if (!credentials) return null;
-
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email },
-        });
-
-        if (!user) {
-          throw new Error('ไม่พบบัญชีผู้ใช้นี้ในระบบ');
-        }
-
-        const isValidPassword = await bcrypt.compare(credentials.password, user.password);
-
-        if (!isValidPassword) {
-          throw new Error('รหัสผ่านไม่ถูกต้อง');
-        }
+        await rateLimit('login-global', 'all', 100, 60_000)
+        const email = normalizedEmail(credentials?.email)
+        const password = credentials?.password
+        if (!email || typeof password !== 'string' || !password || Buffer.byteLength(password) > 72) return null
+        await rateLimit('login-email', email, 10, 900_000)
+        const user = await prisma.user.findUnique({ where: { email } })
+        // Constant-cost comparison even for an unknown account; same message for both failures.
+        const valid = await bcrypt.compare(password, user?.password ?? '$2b$12$R9h/cIPz0gi.URNNX3kh2OPST9/PgBkqquzi.Ss7KIUgO2t0jWMUW')
+        if (!user || !valid) return null
 
         const now = new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })
         await sendTelegram(
           `◉ <b>เข้าสู่ระบบ</b>\n` +
-          `${user.firstName} ${user.lastName}  ·  <code>${user.role}</code>\n` +
-          `<i>${user.email}</i>\n` +
+          `${escapeHtml(user.firstName)} ${escapeHtml(user.lastName)}  ·  <code>${user.role}</code>\n` +
+          `<i>${escapeHtml(user.email)}</i>\n` +
           `<code>${now}</code>`
         )
 
         return {
           id: user.id,
+          sessionVersion: user.lastPasswordReset?.getTime() ?? 0,
           firstName: user.firstName,
           lastName: user.lastName,
           email: user.email,
@@ -110,36 +110,36 @@ const authOptions: NextAuthOptions = {
     },
   },
   callbacks: {
-    jwt: async ({ token, user, trigger, session }) => {
-      // เรียกจาก useSession().update() หลังผู้ใช้แก้โปรไฟล์ตัวเอง — ไม่งั้นชื่อบน sidebar
-      // จะค้างของเดิมจนกว่าจะ login ใหม่ (JWT ไม่ได้อ่าน DB ซ้ำทุก request)
-      if (trigger === 'update' && session) {
-        const s = session as Record<string, unknown>;
-        if (typeof s.firstName === 'string') token.firstName = s.firstName;
-        if (typeof s.lastName === 'string') token.lastName = s.lastName;
-        if (typeof s.province === 'string' || s.province === null) token.province = (s.province as string) ?? undefined;
-        if (typeof s.amphoe === 'string' || s.amphoe === null) token.amphoe = (s.amphoe as string) ?? undefined;
-        if (typeof s.zone === 'string' || s.zone === null) token.zone = (s.zone as string) ?? undefined;
-        return token;
-      }
+    jwt: async ({ token, user }) => {
       if (user) {
-        token.id = (user as PrismaUser).id;
-        token.firstName = (user as PrismaUser).firstName;
-        token.lastName = (user as PrismaUser).lastName;
-        token.role = (user as PrismaUser).role;
-        token.province = (user as PrismaUser).province ?? undefined;
-        token.amphoe = (user as PrismaUser).amphoe ?? undefined;
-        token.district = (user as PrismaUser).district ?? undefined;
-        token.zone = (user as PrismaUser).zone ?? undefined;
+        token.id = Number(user.id)
+        token.sessionVersion = user.sessionVersion
       }
-      return token;
+      // Missing versions invalidate all pre-hardening JWTs. Never trust useSession.update payloads.
+      if (token.invalid || typeof token.sessionVersion !== 'number' || !Number.isInteger(token.id)) {
+        return { ...token, role: '', invalid: true }
+      }
+      const current = await prisma.user.findUnique({ where: { id: token.id } })
+      if (!current || token.sessionVersion !== (current.lastPasswordReset?.getTime() ?? 0)) {
+        return { ...token, role: '', invalid: true }
+      }
+      token.firstName = current.firstName
+      token.lastName = current.lastName
+      token.email = current.email
+      token.role = current.role
+      token.picture = current.image ?? undefined
+      token.province = current.province ?? undefined
+      token.amphoe = current.amphoe ?? undefined
+      token.district = current.district ?? undefined
+      token.zone = current.zone ?? undefined
+      return token
     },
     session: async ({ session, token }) => {
       if (session.user) {
-        session.user.id = token.id;
+        session.user.id = token.invalid ? 0 : token.id;
         session.user.firstName = token.firstName;
         session.user.lastName = token.lastName;
-        session.user.role = token.role;
+        session.user.role = token.invalid ? '' : token.role;
         session.user.image = token.picture;
         session.user.province = token.province;
         session.user.amphoe = token.amphoe;

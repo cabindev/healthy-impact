@@ -1,7 +1,6 @@
+import { requireAdminPage } from '@/app/lib/auth'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { getServerSession } from 'next-auth'
-import authOptions from '@/app/lib/configs/auth/authOptions'
 import { canManageSurvey } from '@/app/lib/auth'
 import { prisma } from '@/app/lib/prisma'
 import { RISK_COLORS, RISK_ADVICE, type RiskLevel } from '@/app/lib/audit'
@@ -50,6 +49,7 @@ const labelsFrom = (opts: O.Opt[], values: string[]) => values.map((v) => O.labe
 const SITE_LABEL: Record<string, string> = { VILLAGE: 'หมู่บ้าน', WORKPLACE: 'สถานประกอบการ', SCHOOL: 'สถานศึกษา' }
 
 export default async function SurveyDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const session = await requireAdminPage()
   const { id } = await params
   const surveyId = Number(id)
   if (!Number.isInteger(surveyId)) notFound()
@@ -60,7 +60,6 @@ export default async function SurveyDetailPage({ params }: { params: Promise<{ i
   })
   if (!s) notFound()
 
-  const session = await getServerSession(authOptions)
   const canDelete = canManageSurvey(session?.user, s.creatorId)
 
   const t = s.tobacco
@@ -91,7 +90,7 @@ export default async function SurveyDetailPage({ params }: { params: Promise<{ i
           <h1 className="text-xl font-semibold text-gray-800">{s.questionnaireNo || `แบบสอบถาม #${s.id}`}</h1>
           <p className="text-sm text-gray-400 mt-0.5">{name} · {SITE_LABEL[s.siteType]}</p>
         </div>
-        <SurveyActions id={s.id} editable={s.eligible} deletable={canDelete} />
+        <SurveyActions id={s.id} editable={s.eligible && canDelete} deletable={canDelete} />
       </div>
 
       <Section no="◆" title="ข้อมูลการเก็บแบบสอบถาม">
@@ -100,7 +99,7 @@ export default async function SurveyDetailPage({ params }: { params: Promise<{ i
         <Row label="ผู้เก็บข้อมูล">{[s.collectorName, s.collectorPhone].filter(Boolean).join(' · ')}</Row>
         <Row label="วันที่เก็บข้อมูล">{fmtDate(s.createdAt)}</Row>
         <Row label="การตรวจสอบ">
-          <VerifyButton id={s.id} verified={!!s.verifiedAt} verifierName={s.verifierName} verifiedAt={s.verifiedAt ? fmtDate(s.verifiedAt) : null} />
+          {canDelete && <VerifyButton id={s.id} verified={!!s.verifiedAt} verifierName={s.verifierName} verifiedAt={s.verifiedAt ? fmtDate(s.verifiedAt) : null} />}
         </Row>
       </Section>
 

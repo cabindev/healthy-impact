@@ -1,10 +1,11 @@
 'use server'
 
 import { prisma } from '@/app/lib/prisma'
-import { requireAdmin, requireSuperAdmin } from '@/app/lib/auth'
+import { requireAdmin } from '@/app/lib/auth'
 import { PROVINCE_ZONE } from '@/app/lib/province-zone'
 import { revalidatePath } from 'next/cache'
 import bcrypt from 'bcrypt'
+import { validPassword } from '@/app/lib/security-input'
 
 export type RoleValue = 'MEMBER' | 'ADMIN' | 'SUPERADMIN'
 const ROLES: RoleValue[] = ['MEMBER', 'ADMIN', 'SUPERADMIN']
@@ -30,6 +31,7 @@ function areaOf(province?: string) {
 // ADMIN แก้ได้เฉพาะผู้ใช้ที่ปัจจุบันเป็น MEMBER และตั้งได้แค่ MEMBER/ADMIN เท่านั้น (กัน privilege escalation ไป SUPERADMIN)
 export async function updateUserRole(userId: number, role: RoleValue) {
   const session = await requireAdmin()
+  if (!Number.isInteger(userId) || userId <= 0 || !ROLES.includes(role)) throw new Error('ข้อมูลไม่ถูกต้อง')
   if (session.user.id === userId) throw new Error('ไม่สามารถเปลี่ยนสิทธิ์ของตนเองได้')
 
   if (session.user.role !== 'SUPERADMIN') {
@@ -38,7 +40,7 @@ export async function updateUserRole(userId: number, role: RoleValue) {
     if (!target || target.role !== 'MEMBER') throw new Error('ไม่มีสิทธิ์แก้ไขผู้ใช้นี้')
   }
 
-  await prisma.user.update({ where: { id: userId }, data: { role } })
+  await prisma.user.update({ where: { id: userId, ...(session.user.role !== 'SUPERADMIN' ? { role: 'MEMBER' as const } : {}) }, data: { role, lastPasswordReset: new Date() } })
   revalidatePath('/dashboard/users')
 }
 
@@ -47,14 +49,15 @@ function validate(d: UserInput, requirePassword: boolean): string | null {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email?.trim() ?? '')) return 'อีเมลไม่ถูกต้อง'
   if (!ROLES.includes(d.role)) return 'สิทธิ์ไม่ถูกต้อง'
   if (requirePassword || (d.password ?? '').length > 0) {
-    if ((d.password ?? '').length < 5) return 'รหัสผ่านต้องมีอย่างน้อย 5 ตัวอักษร'
+    if (!validPassword(d.password)) return 'รหัสผ่านต้องมีอย่างน้อย 12 ตัวอักษร และไม่เกิน 72 ไบต์'
   }
   return null
 }
 
 // เพิ่มผู้ใช้ใหม่ — เฉพาะ SUPERADMIN
 export async function createUser(data: UserInput): Promise<{ error?: string }> {
-  await requireSuperAdmin()
+  const session = await requireAdmin()
+  if (session.user.role !== 'SUPERADMIN') throw new Error('Unauthorized')
   const err = validate(data, true)
   if (err) return { error: err }
 
@@ -66,7 +69,7 @@ export async function createUser(data: UserInput): Promise<{ error?: string }> {
       firstName: data.firstName.trim(),
       lastName: data.lastName.trim(),
       email,
-      password: bcrypt.hashSync(data.password!, 10),
+      password: await bcrypt.hash(data.password!, 12),
       role: data.role,
       ...areaOf(data.province),
     },
@@ -77,13 +80,16 @@ export async function createUser(data: UserInput): Promise<{ error?: string }> {
 
 // แก้ไขผู้ใช้ — เฉพาะ SUPERADMIN (เว้น password = ไม่เปลี่ยน · ห้ามลดสิทธิ์ตนเอง)
 export async function updateUser(userId: number, data: UserInput): Promise<{ error?: string }> {
-  const session = await requireSuperAdmin()
+  const session = await requireAdmin()
+  if (session.user.role !== 'SUPERADMIN') throw new Error('Unauthorized')
   const err = validate(data, false)
   if (err) return { error: err }
   if (session.user.id === userId && data.role !== 'SUPERADMIN') {
     return { error: 'ไม่สามารถลดสิทธิ์ของตนเองได้' }
   }
 
+  const target = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } })
+  if (!target) return { error: 'ไม่พบผู้ใช้งาน' }
   const email = data.email.trim().toLowerCase()
   const dup = await prisma.user.findUnique({ where: { email } })
   if (dup && dup.id !== userId) return { error: 'มีอีเมลนี้แล้วในระบบ' }
@@ -96,7 +102,9 @@ export async function updateUser(userId: number, data: UserInput): Promise<{ err
       email,
       role: data.role,
       ...areaOf(data.province),
-      ...(data.password ? { password: bcrypt.hashSync(data.password, 10) } : {}),
+      ...(data.password ? { password: await bcrypt.hash(data.password, 12), resetToken: null, resetTokenExpiresAt: null } : {}),
+      // Password and role changes invalidate existing sessions, including when changed back.
+      ...((data.password || target?.role !== data.role) ? { lastPasswordReset: new Date() } : {}),
     },
   })
   revalidatePath('/dashboard/users')
@@ -138,7 +146,8 @@ export async function updateMyProfile(data: MyProfileInput): Promise<{ error?: s
 
 // ลบผู้ใช้ — เฉพาะ SUPERADMIN (ห้ามลบตนเอง · ปลด creatorId ของแบบสอบถามก่อนกัน FK)
 export async function deleteUser(userId: number): Promise<{ error?: string }> {
-  const session = await requireSuperAdmin()
+  const session = await requireAdmin()
+  if (session.user.role !== 'SUPERADMIN') throw new Error('Unauthorized')
   if (session.user.id === userId) return { error: 'ไม่สามารถลบบัญชีของตนเองได้' }
 
   await prisma.$transaction([

@@ -1,3 +1,4 @@
+import { requireAdminPage, canManageSurvey } from '@/app/lib/auth'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { prisma } from '@/app/lib/prisma'
@@ -16,6 +17,7 @@ const arr = (s?: string | null): string[] => {
 }
 
 export default async function EditSurveyPage({ params }: { params: Promise<{ id: string }> }) {
+  const session = await requireAdminPage()
   const { id } = await params
   const surveyId = Number(id)
   if (!Number.isInteger(surveyId)) notFound()
@@ -24,7 +26,7 @@ export default async function EditSurveyPage({ params }: { params: Promise<{ id:
     where: { id: surveyId },
     include: { tobacco: true, alcohol: true },
   })
-  if (!s) notFound()
+  if (!s || !canManageSurvey(session.user, s.creatorId)) notFound()
 
   const t = s.tobacco
   const a = s.alcohol

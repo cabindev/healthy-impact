@@ -1,4 +1,5 @@
 import { getServerSession } from 'next-auth'
+import { redirect } from 'next/navigation'
 import authOptions from '@/app/lib/configs/auth/authOptions'
 
 export async function requireAdmin() {
@@ -8,8 +9,8 @@ export async function requireAdmin() {
 }
 
 export async function requireSuperAdmin() {
-  const session = await getServerSession(authOptions)
-  if (!session || session.user.role !== 'SUPERADMIN') throw new Error('Unauthorized')
+  const session = await requireAdmin()
+  if (session.user.role !== 'SUPERADMIN') throw new Error('Unauthorized')
   return session
 }
 
@@ -21,5 +22,12 @@ export function canManageSurvey(
 ): boolean {
   if (!user) return false
   if (user.role === 'SUPERADMIN') return true
-  return creatorId !== null && creatorId === user.id
+  return user.role === 'ADMIN' && creatorId !== null && creatorId === user.id
+}
+
+// Pages must check before fetching data, even when a layout/proxy also checks.
+export async function requireAdminPage() {
+  const session = await getServerSession(authOptions)
+  if (!session || !['ADMIN', 'SUPERADMIN'].includes(session.user.role)) redirect('/auth/signin')
+  return session
 }

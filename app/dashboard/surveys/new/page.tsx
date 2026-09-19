@@ -1,6 +1,8 @@
+import { requireAdminPage } from '@/app/lib/auth'
 import SurveyForm from './SurveyForm'
 
-export default function NewSurveyPage() {
+export default async function NewSurveyPage() {
+  await requireAdminPage()
   return (
     <div className="space-y-5">
       <div>

@@ -4,7 +4,7 @@
 จึงสืบทอดกติกาเดิมส่วนใหญ่ — โปรดอ่านให้ครบก่อนแก้โค้ด
 
 ## Next.js Version Warning
-ใช้ Next.js **16.2.4** (Turbopack, App Router) — มี breaking changes
+ใช้ Next.js **16.3.5** (Turbopack, App Router) — มี breaking changes
 อ่าน `node_modules/next/dist/docs/` ก่อนเขียนโค้ดใหม่เสมอ
 
 ## Critical Rules

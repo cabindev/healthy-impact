@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useId, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Dialog } from '@base-ui-components/react/dialog'
 import { UserPlus, SquarePen, Trash2, X, Loader2 } from 'lucide-react'
@@ -22,10 +22,12 @@ function UserFormDialog({
   const [open, setOpen] = useState(false)
   const [pending, start] = useTransition()
   const [error, setError] = useState('')
+  const formId = useId()
   const blank: UserInput = { firstName: '', lastName: '', email: '', password: '', role: 'MEMBER', province: '' }
   const [form, setForm] = useState<UserInput>(blank)
 
   const onOpenChange = (o: boolean) => {
+    if (pending) return
     setOpen(o)
     if (o) {
       setError('')
@@ -42,19 +44,21 @@ function UserFormDialog({
     e.preventDefault()
     setError('')
     start(async () => {
-      const res = mode === 'create' ? await createUser(form) : await updateUser(user!.id, form)
-      if (res?.error) { setError(res.error); return }
-      setOpen(false)
-      router.refresh()
+      try {
+        const res = mode === 'create' ? await createUser(form) : await updateUser(user!.id, form)
+        if (res?.error) { setError(res.error); return }
+        setOpen(false)
+        router.refresh()
+      } catch { setError('บันทึกไม่สำเร็จ กรุณาลองอีกครั้ง') }
     })
   }
 
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
-      <Dialog.Trigger className={triggerClassName}>{children}</Dialog.Trigger>
+      <Dialog.Trigger aria-label={mode === 'create' ? 'เพิ่มผู้ใช้งาน' : `แก้ไข ${user?.firstName} ${user?.lastName}`} className={triggerClassName}>{children}</Dialog.Trigger>
       <Dialog.Portal>
         <Dialog.Backdrop className="fixed inset-0 z-50 bg-black/40" />
-        <Dialog.Popup className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 w-[400px] max-w-[calc(100vw-2rem)] bg-white rounded-xl shadow-2xl outline-none">
+        <Dialog.Popup className="fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2 max-h-[calc(100dvh-2rem)] overflow-y-auto w-[440px] max-w-[calc(100vw-2rem)] bg-white rounded-xl shadow-2xl outline-none">
           <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
             <Dialog.Title className="text-sm font-semibold text-gray-800">
               {mode === 'create' ? 'เพิ่มผู้ใช้งาน' : 'แก้ไขผู้ใช้งาน'}
@@ -67,30 +71,30 @@ function UserFormDialog({
           <form onSubmit={submit} className="px-5 py-4 space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className={label}>ชื่อ</label>
-                <input className={field} value={form.firstName} onChange={set('firstName')} autoFocus />
+                <label htmlFor={`${formId}-firstName`} className={label}>ชื่อ</label>
+                <input id={`${formId}-firstName`} required className={field} value={form.firstName} onChange={set('firstName')} autoFocus />
               </div>
               <div>
-                <label className={label}>นามสกุล</label>
-                <input className={field} value={form.lastName} onChange={set('lastName')} />
+                <label htmlFor={`${formId}-lastName`} className={label}>นามสกุล</label>
+                <input id={`${formId}-lastName`} required className={field} value={form.lastName} onChange={set('lastName')} />
               </div>
             </div>
             <div>
-              <label className={label}>อีเมล</label>
-              <input type="email" className={field} value={form.email} onChange={set('email')} />
+              <label htmlFor={`${formId}-email`} className={label}>อีเมล</label>
+              <input id={`${formId}-email`} required type="email" className={field} value={form.email} onChange={set('email')} />
             </div>
             <div>
-              <label className={label}>
+              <label htmlFor={`${formId}-password`} className={label}>
                 รหัสผ่าน {mode === 'edit' && <span className="font-normal text-gray-400">(เว้นว่างถ้าไม่เปลี่ยน)</span>}
               </label>
-              <input type="password" autoComplete="new-password" className={field}
+              <input id={`${formId}-password`} required={mode === 'create'} minLength={12} type="password" autoComplete="new-password" className={field}
                 value={form.password} onChange={set('password')} placeholder={mode === 'edit' ? '••••••' : ''} />
             </div>
             <div>
-              <label className={label}>
+              <label htmlFor={`${formId}-province`} className={label}>
                 จังหวัดที่สังกัด <span className="font-normal text-gray-400">(ภาคเติมให้อัตโนมัติ)</span>
               </label>
-              <select className={field} value={form.province ?? ''} onChange={set('province')}>
+              <select id={`${formId}-province`} className={field} value={form.province ?? ''} onChange={set('province')}>
                 <option value="">ไม่ระบุสังกัด</option>
                 {PROVINCES.map((p) => <option key={p} value={p}>{p}</option>)}
               </select>
@@ -99,14 +103,14 @@ function UserFormDialog({
               )}
             </div>
             <div>
-              <label className={label}>สิทธิ์</label>
-              <select className={field} value={form.role} onChange={set('role')} disabled={isSelf}>
+              <label htmlFor={`${formId}-role`} className={label}>สิทธิ์</label>
+              <select id={`${formId}-role`} className={field} value={form.role} onChange={set('role')} disabled={isSelf}>
                 {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
               </select>
               {isSelf && <p className="mt-1 text-[11px] text-gray-400">เปลี่ยนสิทธิ์ของตนเองไม่ได้</p>}
             </div>
 
-            {error && <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
+            {error && <p role="alert" className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
 
             <div className="flex justify-end gap-2 pt-1">
               <Dialog.Close className="px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-gray-50">ยกเลิก</Dialog.Close>
@@ -135,8 +139,8 @@ export function AddUserButton() {
 export function EditUserButton({ user, isSelf }: { user: UserLite; isSelf?: boolean }) {
   return (
     <UserFormDialog mode="edit" user={user} isSelf={isSelf}
-      triggerClassName="inline-flex items-center justify-center text-gray-400 hover:text-green-600 transition-colors">
-      <SquarePen className="w-4 h-4" />
+      triggerClassName="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-gray-200 px-2.5 text-xs text-gray-600 hover:border-green-200 hover:bg-green-50 hover:text-green-700 transition-colors">
+      <SquarePen aria-hidden="true" className="w-3.5 h-3.5" /> แก้ไข
     </UserFormDialog>
   )
 }
@@ -150,17 +154,19 @@ export function DeleteUserButton({ user }: { user: UserLite }) {
   const onDelete = () => {
     setError('')
     start(async () => {
-      const res = await deleteUser(user.id)
-      if (res?.error) { setError(res.error); return }
-      setOpen(false)
-      router.refresh()
+      try {
+        const res = await deleteUser(user.id)
+        if (res?.error) { setError(res.error); return }
+        setOpen(false)
+        router.refresh()
+      } catch { setError('ลบไม่สำเร็จ กรุณาลองอีกครั้ง') }
     })
   }
 
   return (
-    <Dialog.Root open={open} onOpenChange={(o) => { setOpen(o); if (o) setError('') }}>
-      <Dialog.Trigger aria-label="ลบ" title="ลบ"
-        className="inline-flex items-center justify-center text-gray-400 hover:text-red-600 transition-colors">
+    <Dialog.Root open={open} onOpenChange={(o) => { if (pending) return; setOpen(o); if (o) setError('') }}>
+      <Dialog.Trigger aria-label={`ลบ ${user.firstName} ${user.lastName}`} title="ลบผู้ใช้"
+        className="inline-flex size-9 items-center justify-center rounded-lg text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors">
         <Trash2 className="w-4 h-4" />
       </Dialog.Trigger>
       <Dialog.Portal>
@@ -170,7 +176,7 @@ export function DeleteUserButton({ user }: { user: UserLite }) {
           <p className="mt-2 text-sm text-gray-500">
             ต้องการลบ <b className="text-gray-800">{user.firstName} {user.lastName}</b> ({user.email})? การลบนี้ย้อนกลับไม่ได้
           </p>
-          {error && <p className="mt-3 text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
+          {error && <p role="alert" className="mt-3 text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
           <div className="mt-4 flex justify-end gap-2">
             <Dialog.Close className="px-4 py-2 text-sm text-gray-600 rounded-lg hover:bg-gray-50">ยกเลิก</Dialog.Close>
             <button type="button" onClick={onDelete} disabled={pending}

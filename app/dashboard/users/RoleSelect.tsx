@@ -29,7 +29,9 @@ export default function RoleSelect({ userId, role, disabled, roles = ALL_ROLES }
   }
 
   return (
+    <div className="space-y-1">
     <select
+      aria-label="เปลี่ยนสิทธิ์ผู้ใช้งาน"
       value={value}
       disabled={pending}
       onChange={(e) => change(e.target.value as RoleValue)}
@@ -40,5 +42,8 @@ export default function RoleSelect({ userId, role, disabled, roles = ALL_ROLES }
         <option key={r} value={r}>{r}</option>
       ))}
     </select>
+    {pending && <p role="status" className="text-xs text-gray-500">กำลังบันทึก...</p>}
+    {error && <p role="alert" className="text-xs text-red-600">เปลี่ยนสิทธิ์ไม่สำเร็จ กรุณาลองอีกครั้ง</p>}
+    </div>
   )
 }

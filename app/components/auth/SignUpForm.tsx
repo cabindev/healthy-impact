@@ -110,7 +110,7 @@ export default function SignUpForm() {
           {/* รหัสผ่าน */}
           <div>
             <label className={labelClass}>รหัสผ่าน</label>
-            <input type="password" required className={inputClass} placeholder="อย่างน้อย 5 ตัวอักษร"
+            <input type="password" required minLength={12} className={inputClass} placeholder="อย่างน้อย 12 ตัวอักษร"
               value={formData.password}
               onChange={e => setFormData(p => ({ ...p, password: e.target.value }))} />
           </div>

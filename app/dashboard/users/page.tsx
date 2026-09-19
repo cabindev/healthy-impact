@@ -1,25 +1,14 @@
-import { getServerSession } from 'next-auth'
-import authOptions from '@/app/lib/configs/auth/authOptions'
+import { requireAdminPage } from '@/app/lib/auth'
 import { prisma } from '@/app/lib/prisma'
-import RoleSelect from './RoleSelect'
-import { AddUserButton, EditUserButton, DeleteUserButton } from './UserActions'
-import type { RoleValue } from '@/app/actions/user'
+import UsersDirectory from './UsersDirectory'
 
 export const dynamic = 'force-dynamic'
 
 export default async function UsersPage() {
-  const session = await getServerSession(authOptions)
+  const session = await requireAdminPage()
   const isSuperAdmin = session?.user.role === 'SUPERADMIN'
   const isAdmin = session?.user.role === 'ADMIN'
   const meId = session?.user.id
-
-  // SUPERADMIN แก้ role ใครก็ได้ (เว้นตนเอง) · ADMIN แก้ได้เฉพาะคนที่ยังเป็น MEMBER
-  const canEditRole = (u: { id: number; role: RoleValue }) => {
-    if (u.id === meId) return false
-    if (isSuperAdmin) return true
-    if (isAdmin) return u.role === 'MEMBER'
-    return false
-  }
 
   // ซ่อนบัญชี SUPERADMIN คนอื่นจากทุกคน — เห็นได้เฉพาะตัวเขาเอง
   const users = await prisma.user.findMany({
@@ -37,66 +26,5 @@ export default async function UsersPage() {
   const ROLE_RANK: Record<string, number> = { SUPERADMIN: 0, ADMIN: 1, MEMBER: 2 }
   users.sort((a, b) => (ROLE_RANK[a.role] ?? 99) - (ROLE_RANK[b.role] ?? 99))
 
-  return (
-    <div className="space-y-6">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-gray-800">ผู้ใช้งาน</h1>
-          {isSuperAdmin && <p className="text-sm text-gray-400 mt-0.5">เพิ่ม/แก้ไข/ลบ และเปลี่ยนสิทธิ์ผู้ใช้งานได้</p>}
-        </div>
-        {isSuperAdmin && <AddUserButton />}
-      </div>
-
-      <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 text-gray-500">
-            <tr>
-              <th className="text-left font-medium px-4 py-3">ชื่อ</th>
-              <th className="text-left font-medium px-4 py-3">อีเมล</th>
-              <th className="text-left font-medium px-4 py-3">สังกัด</th>
-              <th className="text-right font-medium px-4 py-3">จำนวนงาน</th>
-              <th className="text-left font-medium px-4 py-3">สิทธิ์</th>
-              {isSuperAdmin && <th className="px-4 py-3 w-24"></th>}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {users.length === 0 ? (
-              <tr><td colSpan={isSuperAdmin ? 6 : 5} className="px-4 py-8 text-center text-gray-400">ยังไม่มีผู้ใช้งาน</td></tr>
-            ) : users.map((u) => (
-              <tr key={u.id}>
-                <td className="px-4 py-3 text-gray-700">{u.firstName} {u.lastName}{u.id === meId && <span className="text-gray-400 text-xs ml-1">(คุณ)</span>}</td>
-                <td className="px-4 py-3 text-gray-500">{u.email}</td>
-                <td className="px-4 py-3">
-                  {u.province
-                    ? <span className="text-gray-700">{u.province}<span className="text-gray-400"> · ภาค{u.zone ?? 'ไม่ทราบ'}</span></span>
-                    : <span className="text-gray-300">ไม่ระบุ</span>}
-                </td>
-                <td className="px-4 py-3 text-right tabular-nums">
-                  {u._count.surveys > 0
-                    ? <span className="text-gray-800 font-medium">{u._count.surveys.toLocaleString()}</span>
-                    : <span className="text-gray-300">0</span>}
-                </td>
-                <td className="px-4 py-3">
-                  <RoleSelect
-                    userId={u.id}
-                    role={u.role as RoleValue}
-                    disabled={!canEditRole({ id: u.id, role: u.role as RoleValue })}
-                    roles={isSuperAdmin ? undefined : ['MEMBER', 'ADMIN']}
-                  />
-                </td>
-                {isSuperAdmin && (
-                  <td className="px-4 py-3">
-                    <div className="flex items-center justify-end gap-3">
-                      <EditUserButton user={{ id: u.id, firstName: u.firstName, lastName: u.lastName, email: u.email, role: u.role as RoleValue, province: u.province }} isSelf={u.id === meId} />
-                      {u.id !== meId && <DeleteUserButton user={{ id: u.id, firstName: u.firstName, lastName: u.lastName, email: u.email, role: u.role as RoleValue }} />}
-                    </div>
-                  </td>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  )
+  return <UsersDirectory users={users.map((user) => ({ ...user, createdAt: user.createdAt.toISOString() }))} meId={meId} isSuperAdmin={isSuperAdmin} isAdmin={isAdmin} />
 }

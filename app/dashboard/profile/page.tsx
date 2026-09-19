@@ -1,7 +1,6 @@
+import { requireAdminPage } from '@/app/lib/auth'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { getServerSession } from 'next-auth'
-import authOptions from '@/app/lib/configs/auth/authOptions'
 import { prisma } from '@/app/lib/prisma'
 import { RISK_COLORS, type RiskLevel } from '@/app/lib/audit'
 import { CheckCircle2, ClipboardList, MapPin, Plus, ShieldCheck, Trash2 } from 'lucide-react'
@@ -60,7 +59,7 @@ function BarList({ items }: { items: { name: string; value: number }[] }) {
 }
 
 export default async function ProfilePage() {
-  const session = await getServerSession(authOptions)
+  const session = await requireAdminPage()
   if (!session) redirect('/auth/signin')
 
   const meId = session.user.id

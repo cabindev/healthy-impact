@@ -99,18 +99,19 @@ export default function AreaFilter({ combos, admins = [] }: { combos: GeoCombo[]
       {LEVELS.map((level) => (
         <select
           key={level}
+          aria-label={`กรองตาม${LABEL[level]}`}
           value={current[level]}
           onChange={(e) => change(level, e.target.value)}
           disabled={noArea || options[level].length === 0}
-          className="px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-700 bg-white focus:outline-none focus:border-green-500 disabled:opacity-40 disabled:cursor-not-allowed">
+          className="min-h-10 max-w-full px-3 py-2 border border-gray-200 rounded-lg text-xs text-gray-700 bg-white focus:outline-none focus:border-green-500 disabled:opacity-40 disabled:cursor-not-allowed">
           <option value="">{LABEL[level]}ทั้งหมด</option>
           {options[level].map((v) => (
             <option key={v} value={v}>{v}</option>
           ))}
         </select>
       ))}
-      <button type="button" onClick={toggleNoArea}
-        className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs border transition-colors ${
+      <button type="button" onClick={toggleNoArea} aria-pressed={noArea}
+        className={`inline-flex items-center gap-1.5 min-h-10 px-3 py-2 rounded-lg text-xs border transition-colors ${
           noArea ? 'border-amber-300 bg-amber-50 text-amber-700 font-medium' : 'border-gray-200 text-gray-500 hover:bg-gray-50'
         }`}>
         <MapPinOff className="w-3.5 h-3.5" /> ไม่ระบุพื้นที่
@@ -118,14 +119,14 @@ export default function AreaFilter({ combos, admins = [] }: { combos: GeoCombo[]
       {admins.length > 0 && (
         <label className="inline-flex items-center gap-1.5">
           <UserRound className="w-3.5 h-3.5 text-gray-400" aria-hidden />
-          <span className="sr-only">กรองตาม admin ผู้บันทึก</span>
+          <span className="sr-only">กรองตามผู้บันทึก</span>
           <select
             value={creator}
             onChange={(e) => changeCreator(e.target.value)}
-            className={`px-2.5 py-1.5 border rounded-lg text-xs bg-white focus:outline-none focus:border-green-500 ${
+            className={`min-h-10 max-w-full px-3 py-2 border rounded-lg text-xs bg-white focus:outline-none focus:border-green-500 ${
               creator ? 'border-green-300 text-green-700 font-medium' : 'border-gray-200 text-gray-700'
             }`}>
-            <option value="">adminทั้งหมด</option>
+            <option value="">ผู้บันทึกทั้งหมด</option>
             {admins.map((a) => (
               <option key={a.id} value={a.id}>{a.name} ({a.count.toLocaleString()})</option>
             ))}
@@ -135,7 +136,7 @@ export default function AreaFilter({ combos, admins = [] }: { combos: GeoCombo[]
       {active && (
         <button type="button" onClick={clearAll}
           className="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-red-500 px-1.5 py-1.5">
-          <X className="w-3.5 h-3.5" /> ล้างตัวกรอง
+          <X className="w-3.5 h-3.5" /> ล้างพื้นที่/ผู้บันทึก
         </button>
       )}
     </div>

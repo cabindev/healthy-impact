@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, FormEvent } from 'react'
+import { validPassword } from '@/app/lib/security-input'
 import { useSearchParams } from 'next/navigation'
 
 export default function ResetPasswordForm() {
@@ -18,8 +19,8 @@ export default function ResetPasswordForm() {
       setError('รหัสผ่านไม่ตรงกัน')
       return
     }
-    if (password.length < 5) {
-      setError('รหัสผ่านต้องมีความยาวอย่างน้อย 5 ตัวอักษร')
+    if (!validPassword(password)) {
+      setError('รหัสผ่านต้องมีอย่างน้อย 12 ตัวอักษร และไม่เกิน 72 ไบต์')
       return
     }
 

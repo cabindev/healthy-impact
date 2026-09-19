@@ -11,7 +11,13 @@ app.prepare().then(() => {
   const server = express();
 
   // serve uploaded profile images
-  server.use('/img', express.static(path.join(__dirname, 'public/img')));
+  server.use('/img', express.static(path.join(__dirname, 'public/img'), {
+    setHeaders(res) {
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");
+      res.setHeader('Content-Disposition', 'attachment');
+    },
+  }));
 
   // serve community document uploads
   server.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));

@@ -2,11 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 
 export async function proxy(request: NextRequest) {
-  const token = await getToken({
-    req: request,
-    secret: process.env.NEXTAUTH_SECRET,
-    cookieName: 'healthy-impact.session-token',
-  });
+  let token = null
+  try {
+    token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET, cookieName: 'healthy-impact.session-token' })
+  } catch { /* Malformed authorization headers must fail closed. */ }
 
   const { pathname } = request.nextUrl;
 
@@ -14,10 +13,6 @@ export async function proxy(request: NextRequest) {
 
   if (pathname.startsWith('/dashboard') && (!token || !isAdmin)) {
     return NextResponse.redirect(new URL('/auth/signin', request.url));
-  }
-
-  if (pathname.startsWith('/auth/signin') && isAdmin) {
-    return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
   return NextResponse.next();

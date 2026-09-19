@@ -1,7 +1,7 @@
 'use server'
 
 import { prisma } from '@/app/lib/prisma'
-import { requireAdmin, requireSuperAdmin, canManageSurvey } from '@/app/lib/auth'
+import { requireAdmin, canManageSurvey } from '@/app/lib/auth'
 import { buildSurveyWhere, type SurveyFilterParams } from '@/app/lib/survey-filters'
 import { evaluateAudit } from '@/app/lib/audit'
 import { labeledSurvey, SURVEY_INCLUDE } from '@/app/lib/survey-export'
@@ -270,15 +270,16 @@ export async function createIneligible(data: {
 }
 
 export async function updateSurvey(id: number, data: SurveyPayload) {
-  await requireAdmin()
+  const session = await requireAdmin()
 
   const tobacco = buildTobacco(data)
   const alcohol = buildAlcohol(data)
 
   await prisma.survey.update({
-    where: { id },
+    where: { id, ...(session.user.role === 'SUPERADMIN' ? {} : { creatorId: session.user.id }) },
     data: {
       ...buildScalars(data),
+      verifiedAt: null, verifierName: null, verifierPhone: null,
       // upsert เผื่อแบบสอบถามเดิมยังไม่มี record รายส่วน
       tobacco: { upsert: { create: tobacco, update: tobacco } },
       alcohol: { upsert: { create: alcohol, update: alcohol } },
@@ -295,7 +296,7 @@ export async function updateSurvey(id: number, data: SurveyPayload) {
 export async function verifySurvey(id: number) {
   const session = await requireAdmin()
   await prisma.survey.update({
-    where: { id },
+    where: { id, ...(session.user.role === 'SUPERADMIN' ? {} : { creatorId: session.user.id }) },
     data: {
       verifiedAt: new Date(),
       verifierName: `${session.user.firstName} ${session.user.lastName}`.trim(),
@@ -307,9 +308,9 @@ export async function verifySurvey(id: number) {
 
 // ยกเลิกการตรวจสอบ (เผื่อ stamp ผิด)
 export async function unverifySurvey(id: number) {
-  await requireAdmin()
+  const session = await requireAdmin()
   await prisma.survey.update({
-    where: { id },
+    where: { id, ...(session.user.role === 'SUPERADMIN' ? {} : { creatorId: session.user.id }) },
     data: { verifiedAt: null, verifierName: null, verifierPhone: null },
   })
   revalidatePath('/dashboard/surveys')
@@ -321,19 +322,20 @@ export async function setSurveyArea(
   ids: number[],
   area: { tambon: string; amphoe: string; province: string },
 ): Promise<{ ok: true; updated: number } | { ok: false; error: string }> {
-  await requireAdmin()
+  const session = await requireAdmin()
 
-  const clean = ids.filter((id) => Number.isInteger(id))
+  const clean = [...new Set(ids.filter((id) => Number.isInteger(id) && id > 0))]
   if (clean.length === 0) return { ok: false, error: 'ยังไม่ได้เลือกรายการ' }
   if (!area.tambon?.trim() || !area.province?.trim()) return { ok: false, error: 'กรุณาเลือกตำบล' }
 
-  const { count } = await prisma.survey.updateMany({
-    where: { id: { in: clean } },
-    data: {
-      tambon: area.tambon.trim(),
-      amphoe: area.amphoe.trim() || null,
-      province: area.province.trim(),
-    },
+  const count = await prisma.$transaction(async tx => {
+    const allowed = { id: { in: clean }, ...(session.user.role === 'SUPERADMIN' ? {} : { creatorId: session.user.id }) }
+    const result = await tx.survey.updateMany({
+      where: allowed,
+      data: { tambon: area.tambon.trim(), amphoe: area.amphoe.trim() || null, province: area.province.trim(), verifiedAt: null, verifierName: null, verifierPhone: null },
+    })
+    if (result.count !== clean.length) throw new Error('แก้ไขได้เฉพาะแบบสอบถามที่คุณเป็นผู้บันทึกเท่านั้น')
+    return result.count
   })
 
   revalidatePath('/dashboard/surveys')
@@ -348,7 +350,8 @@ export async function assignSurveyCreator(
   filter: SurveyFilterParams,
   userId: number,
 ): Promise<{ ok: true; updated: number } | { ok: false; error: string }> {
-  await requireSuperAdmin()
+  const session = await requireAdmin()
+  if (session.user.role !== 'SUPERADMIN') throw new Error('Unauthorized')
 
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } })
   if (!user || (user.role !== 'ADMIN' && user.role !== 'SUPERADMIN')) {
@@ -379,7 +382,7 @@ export async function deleteSurvey(id: number): Promise<DeleteResult> {
     return { ok: false, error: 'ลบได้เฉพาะแบบสอบถามที่คุณเป็นผู้บันทึกเท่านั้น' }
   }
 
-  await prisma.survey.delete({ where: { id } })
+  await prisma.survey.delete({ where: { id, ...(session.user.role === 'SUPERADMIN' ? {} : { creatorId: session.user.id }) } })
   revalidatePath('/dashboard/surveys')
   revalidatePath('/dashboard')
   revalidatePath('/dashboard/profile')

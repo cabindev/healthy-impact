@@ -1,84 +1,47 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-import crypto from 'crypto';
-import nodemailer from 'nodemailer';
-
-const prisma = new PrismaClient();
+import { NextResponse } from 'next/server'
+import { createHash, randomBytes } from 'node:crypto'
+import nodemailer from 'nodemailer'
+import { prisma } from '@/app/lib/prisma'
+import { normalizedEmail } from '@/app/lib/security-input'
+import { readJson, requestError, RequestError } from '@/app/lib/security-request'
+import { rateLimit } from '@/app/lib/rate-limit'
 
 const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 587,
-  secure: false,
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
+  host: 'smtp.gmail.com', port: 587, secure: false, requireTLS: true,
+  auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
+})
+const accepted = () => NextResponse.json({ message: 'หากอีเมลนี้มีบัญชีในระบบ คุณจะได้รับลิงก์สำหรับรีเซ็ตรหัสผ่าน' }, { headers: { 'Cache-Control': 'no-store' } })
 
-export async function POST(req: NextRequest) {
+export async function POST(req: Request) {
   try {
-    const { email } = await req.json();
-
-    const user = await prisma.user.findUnique({ where: { email } });
-
-    if (!user) {
-      return NextResponse.json({ error: 'ไม่พบผู้ใช้งานในระบบ' }, { status: 404 });
+    await rateLimit('forgot-global', 'all', 30, 60_000)
+    const email = normalizedEmail((await readJson(req)).email)
+    if (!email) throw new RequestError('อีเมลไม่ถูกต้อง')
+    await rateLimit('forgot-email', email, 3, 3_600_000)
+    const rawToken = randomBytes(32).toString('hex')
+    const digest = createHash('sha256').update(rawToken).digest('hex')
+    const now = new Date()
+    // No account-existence response difference; cooldown cannot be raced across workers.
+    const { count } = await prisma.user.updateMany({
+      where: { email, OR: [{ resetTokenCreatedAt: null }, { resetTokenCreatedAt: { lt: new Date(now.getTime() - 60_000) } }] },
+      data: { resetToken: digest, resetTokenCreatedAt: now, resetTokenExpiresAt: new Date(now.getTime() + 3_600_000) },
+    })
+    if (!count) return accepted()
+    try {
+      const base = process.env.NEXTAUTH_URL
+      if (!base) throw new Error('Missing NEXTAUTH_URL')
+      const resetUrl = new URL('/auth/reset-password', base)
+      if (process.env.NODE_ENV === 'production' && resetUrl.protocol !== 'https:') throw new Error('HTTPS required')
+      resetUrl.searchParams.set('token', rawToken)
+      await transporter.sendMail({
+        from: process.env.EMAIL_USER, to: email, subject: 'รีเซ็ตรหัสผ่าน - Healthy Impact',
+        text: `คุณสามารถตั้งรหัสผ่านใหม่ได้ที่ ${resetUrl.toString()}\nลิงก์หมดอายุใน 1 ชั่วโมง หากไม่ได้ร้องขอ คุณไม่จำเป็นต้องดำเนินการใด ๆ`,
+      })
+    } catch {
+      // Do not leak account existence or a token through errors/logs.
+      console.error('[forgot-password] Unable to send reset email')
+      await prisma.user.updateMany({ where: { email, resetToken: digest }, data: { resetToken: null, resetTokenExpiresAt: null } })
     }
-
-    const token = crypto.randomBytes(32).toString('hex');
-    const expiresAt = new Date(Date.now() + 3600000);
-
-    await prisma.user.update({
-      where: { email },
-      data: {
-        resetToken: token,
-        resetTokenCreatedAt: new Date(),
-        resetTokenExpiresAt: expiresAt,
-      },
-    });
-
-    const resetUrl = `${process.env.NEXTAUTH_URL}/auth/reset-password?token=${token}`;
-
-    const htmlContent = `
-<!DOCTYPE html>
-<html lang="th">
-<head>
-  <meta charset="UTF-8">
-  <title>รีเซ็ตรหัสผ่าน - Healthy Impact</title>
-</head>
-<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0;">
-  <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 600px; margin: 0 auto; padding: 20px;">
-    <tr>
-      <td>
-        <h2 style="color: #2563eb;">รีเซ็ตรหัสผ่านของคุณ</h2>
-        <p>เรียน คุณ${user.firstName},</p>
-        <p>เราได้รับคำขอให้รีเซ็ตรหัสผ่านสำหรับบัญชีของคุณที่ Healthy Impact</p>
-        <p>คลิกที่ปุ่มด้านล่างเพื่อรีเซ็ตรหัสผ่านของคุณ:</p>
-        <table border="0" cellpadding="0" cellspacing="0" width="100%">
-          <tr>
-            <td align="center" style="padding: 20px 0;">
-              <a href="${resetUrl}" style="background-color: #2563eb; color: #ffffff; text-decoration: none; padding: 10px 20px; border-radius: 5px; display: inline-block;">รีเซ็ตรหัสผ่าน</a>
-            </td>
-          </tr>
-        </table>
-        <p>ลิงก์นี้จะหมดอายุภายใน 1 ชั่วโมง</p>
-        <p>ขอแสดงความนับถือ,<br>ทีมงาน Healthy Impact</p>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`;
-
-    await transporter.sendMail({
-      from: '"Healthy Impact" <noreply@healthy-impact.local>',
-      to: email,
-      subject: 'รีเซ็ตรหัสผ่าน - Healthy Impact',
-      html: htmlContent,
-    });
-
-    return NextResponse.json({ message: 'ลิงก์สำหรับรีเซ็ตรหัสผ่านได้ถูกส่งไปยังอีเมลของคุณแล้ว' });
-  } catch (error) {
-    console.error('Error occurred:', error);
-    return NextResponse.json({ error: 'เกิดข้อผิดพลาดในการส่งอีเมล โปรดลองอีกครั้ง' }, { status: 500 });
-  }
+    return accepted()
+  } catch (error) { return requestError(error) }
 }

@@ -1,74 +1,55 @@
-import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcrypt';
-import { NextRequest, NextResponse } from 'next/server';
-import path from 'path';
-import fs from 'fs/promises';
-import { sendTelegram } from '@/app/lib/telegram';
+import { NextResponse } from 'next/server'
+import bcrypt from 'bcrypt'
+import { randomUUID } from 'node:crypto'
+import path from 'node:path'
+import fs from 'node:fs/promises'
+import { prisma } from '@/app/lib/prisma'
+import { sendTelegram } from '@/app/lib/telegram'
+import { normalizedEmail, validPassword, escapeHtml } from '@/app/lib/security-input'
+import { boundedBody, requestError, RequestError } from '@/app/lib/security-request'
+import { profileImage, MAX_IMAGE_BYTES } from '@/app/lib/profile-image'
+import { rateLimit } from '@/app/lib/rate-limit'
 
-const prisma = new PrismaClient();
-
-export async function POST(request: NextRequest) {
+export async function POST(req: Request) {
+  let savedPath: string | undefined
+  let created = false
   try {
-    const formData = await request.formData();
-    const firstName = formData.get('firstName') as string;
-    const lastName = formData.get('lastName') as string;
-    const email = formData.get('email') as string;
-    const password = formData.get('password') as string;
-    const image = formData.get('image') as File | null;
-    const province = formData.get('province') as string | null;
-    const amphoe = formData.get('amphoe') as string | null;
-    const district = formData.get('district') as string | null;
-    const zone = formData.get('zone') as string | null;
-
-    const existingUser = await prisma.user.findUnique({ where: { email } });
-    if (existingUser) {
-      return NextResponse.json({ error: 'มีอีเมลนี้แล้วในระบบ' }, { status: 400 });
+    await rateLimit('signup-global', 'all', 10, 60_000)
+    const bytes = await boundedBody(req, MAX_IMAGE_BYTES + 32_768)
+    let form: FormData
+    try { form = await new Response(new Blob([bytes as BlobPart]), { headers: { 'Content-Type': req.headers.get('content-type') ?? '' } }).formData() }
+    catch { throw new RequestError('ข้อมูลไม่ถูกต้อง') }
+    const text = (key: string) => { const value = form.get(key); return typeof value === 'string' ? value.trim() : '' }
+    const firstName = text('firstName'), lastName = text('lastName')
+    const email = normalizedEmail(form.get('email'))
+    const password = form.get('password')
+    if (!firstName || !lastName || firstName.length > 100 || lastName.length > 100 || !email) throw new RequestError('กรุณาตรวจสอบชื่อ นามสกุล และอีเมล')
+    if (!validPassword(password)) throw new RequestError('รหัสผ่านต้องมีอย่างน้อย 12 ตัวอักษร และไม่เกิน 72 ไบต์')
+    await rateLimit('signup-email', email, 3, 3_600_000)
+    const existing = await prisma.user.findUnique({ where: { email }, select: { id: true } })
+    if (existing) throw new RequestError('ไม่สามารถสมัครด้วยข้อมูลนี้ได้ กรุณาเข้าสู่ระบบหรือใช้เมนูลืมรหัสผ่าน')
+    const image = form.get('image')
+    let imagePath: string | null = null
+    let encoded: Buffer | undefined
+    if (image !== null) {
+      if (!(image instanceof File)) throw new RequestError('รูปภาพไม่ถูกต้อง')
+      if (image.size) encoded = await profileImage(image)
     }
-
-    if (password.length < 5) {
-      return NextResponse.json({ error: 'รหัสผ่านต้องมีความยาวอย่างน้อย 5 ตัวอักษร' }, { status: 400 });
+    const hash = await bcrypt.hash(password, 12)
+    if (encoded) {
+      const filename = `${randomUUID()}.webp`
+      const directory = path.join(process.cwd(), 'public/img')
+      await fs.mkdir(directory, { recursive: true })
+      savedPath = path.join(directory, filename)
+      await fs.writeFile(savedPath, encoded, { flag: 'wx' })
+      imagePath = `/img/${filename}`
     }
-
-    const hashedPassword = bcrypt.hashSync(password, 10);
-
-    let imagePath = '';
-    if (image && image.size > 0) {
-      const imgDir = path.join(process.cwd(), 'public/img');
-      await fs.mkdir(imgDir, { recursive: true });
-      const bufferData = Buffer.from(await image.arrayBuffer());
-      const timestamp = new Date().getTime();
-      const fileExtension = path.extname(image.name) || '.jpg';
-      const fileName = `${timestamp}${fileExtension}`;
-      const imageSavePath = path.join(imgDir, fileName);
-      await fs.writeFile(imageSavePath, bufferData);
-      imagePath = `/img/${fileName}`;
-    }
-
-    const newUser = await prisma.user.create({
-      data: {
-        firstName,
-        lastName,
-        email,
-        password: hashedPassword,
-        image: imagePath || null,
-        province: province || null,
-        amphoe: amphoe || null,
-        district: district || null,
-        zone: zone || null,
-      },
-    });
-
-    const now = new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' })
-    await sendTelegram(
-      `○ <b>สมัครสมาชิก</b>\n` +
-      `${firstName} ${lastName}\n` +
-      `<i>${email}</i>\n` +
-      `<code>${now}</code>`
-    )
-
-    return NextResponse.json({ message: 'ลงทะเบียนสำเร็จ', userId: newUser.id }, { status: 200 });
+    await prisma.user.create({ data: { firstName, lastName, email, password: hash, image: imagePath, role: 'MEMBER' } })
+    created = true
+    await sendTelegram(`○ <b>สมัครสมาชิก</b>\n${escapeHtml(firstName)} ${escapeHtml(lastName)}\n<i>${escapeHtml(email)}</i>`)
+    return NextResponse.json({ message: 'ลงทะเบียนสำเร็จ' })
   } catch (error) {
-    console.error('Error creating user:', error);
-    return NextResponse.json({ error: 'ไม่สามารถสร้างบัญชีผู้ใช้ได้ โปรดลองอีกครั้ง' }, { status: 500 });
+    if (savedPath && !created) await fs.unlink(savedPath).catch(() => {})
+    return requestError(error)
   }
 }
