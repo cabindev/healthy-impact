@@ -151,3 +151,25 @@ test('Excel export preserves Thai text/numbers, treats formula-like text as text
   assert.match(xml, /<v>7<\/v>/)
   assert.doesNotMatch(xml, /<f[ >]/)
 })
+
+test('password policy accepts six characters but rejects five and bcrypt-truncated input', () => {
+  const { validPassword } = loader()('app/lib/security-input.ts')
+  assert.equal(validPassword('abcde'), false)
+  assert.equal(validPassword('abcdef'), true)
+  assert.equal(validPassword('ก'.repeat(25)), false)
+  assert.equal(validPassword('a'.repeat(72)), true)
+  assert.equal(validPassword('a'.repeat(73)), false)
+})
+
+test('reset email provides branded HTML and text, escapes links and rejects unsafe schemes', () => {
+  const { resetPasswordEmail } = loader()('app/lib/reset-password-email.ts')
+  const mail = resetPasswordEmail('https://example.invalid/auth/reset-password?token=demo&x=%22')
+  assert.match(mail.subject, /Healthy Impact Survey/)
+  assert.match(mail.html, /Healthy Impact/)
+  assert.match(mail.html, /SURVEY/)
+  assert.match(mail.html, /&amp;x=/)
+  assert.match(mail.text, /อย่างน้อย 6 ตัวอักษร/)
+  assert.match(mail.text, /1 ชั่วโมง/)
+  assert.doesNotMatch(mail.html, /<script|<img/i)
+  assert.throws(() => resetPasswordEmail('javascript:alert(1)'))
+})

@@ -87,7 +87,7 @@ function UserFormDialog({
               <label htmlFor={`${formId}-password`} className={label}>
                 รหัสผ่าน {mode === 'edit' && <span className="font-normal text-gray-400">(เว้นว่างถ้าไม่เปลี่ยน)</span>}
               </label>
-              <input id={`${formId}-password`} required={mode === 'create'} minLength={12} type="password" autoComplete="new-password" className={field}
+              <input id={`${formId}-password`} required={mode === 'create'} minLength={6} type="password" autoComplete="new-password" className={field}
                 value={form.password} onChange={set('password')} placeholder={mode === 'edit' ? '••••••' : ''} />
             </div>
             <div>

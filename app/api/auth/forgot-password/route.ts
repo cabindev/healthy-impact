@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createHash, randomBytes } from 'node:crypto'
 import nodemailer from 'nodemailer'
 import { prisma } from '@/app/lib/prisma'
+import { resetPasswordEmail } from '@/app/lib/reset-password-email'
 import { normalizedEmail } from '@/app/lib/security-input'
 import { readJson, requestError, RequestError } from '@/app/lib/security-request'
 import { rateLimit } from '@/app/lib/rate-limit'
@@ -34,8 +35,9 @@ export async function POST(req: Request) {
       if (process.env.NODE_ENV === 'production' && resetUrl.protocol !== 'https:') throw new Error('HTTPS required')
       resetUrl.searchParams.set('token', rawToken)
       await transporter.sendMail({
-        from: process.env.EMAIL_USER, to: email, subject: 'รีเซ็ตรหัสผ่าน - Healthy Impact',
-        text: `คุณสามารถตั้งรหัสผ่านใหม่ได้ที่ ${resetUrl.toString()}\nลิงก์หมดอายุใน 1 ชั่วโมง หากไม่ได้ร้องขอ คุณไม่จำเป็นต้องดำเนินการใด ๆ`,
+        from: { name: 'Healthy Impact Survey', address: process.env.EMAIL_USER! },
+        to: email,
+        ...resetPasswordEmail(resetUrl.toString()),
       })
     } catch {
       // Do not leak account existence or a token through errors/logs.

@@ -1,5 +1,5 @@
 // Shared with forms; this module contains no server-only imports.
-export const MIN_PASSWORD_LENGTH = 12
+export const MIN_PASSWORD_LENGTH = 6
 export function validPassword(value: unknown): value is string {
   return typeof value === 'string' && value.length >= MIN_PASSWORD_LENGTH && new TextEncoder().encode(value).length <= 72
 }

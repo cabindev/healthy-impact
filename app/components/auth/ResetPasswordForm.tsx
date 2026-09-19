@@ -20,7 +20,7 @@ export default function ResetPasswordForm() {
       return
     }
     if (!validPassword(password)) {
-      setError('รหัสผ่านต้องมีอย่างน้อย 12 ตัวอักษร และไม่เกิน 72 ไบต์')
+      setError('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร และไม่เกิน 72 ไบต์')
       return
     }
 

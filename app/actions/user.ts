@@ -49,7 +49,7 @@ function validate(d: UserInput, requirePassword: boolean): string | null {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email?.trim() ?? '')) return 'อีเมลไม่ถูกต้อง'
   if (!ROLES.includes(d.role)) return 'สิทธิ์ไม่ถูกต้อง'
   if (requirePassword || (d.password ?? '').length > 0) {
-    if (!validPassword(d.password)) return 'รหัสผ่านต้องมีอย่างน้อย 12 ตัวอักษร และไม่เกิน 72 ไบต์'
+    if (!validPassword(d.password)) return 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร และไม่เกิน 72 ไบต์'
   }
   return null
 }

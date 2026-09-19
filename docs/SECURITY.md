@@ -9,7 +9,7 @@
 
 The migration has been applied to the local `healthy-impact` database. Production deployment/migration has not been performed.
 
-Existing sessions must sign in again: old JWTs have no `sessionVersion`. Existing reset links must be requested again because only SHA-256 token digests are accepted now. New/changed passwords need at least 12 characters and at most 72 UTF-8 bytes (bcrypt limit); existing passwords can still sign in.
+Existing sessions must sign in again: old JWTs have no `sessionVersion`. Existing reset links must be requested again because only SHA-256 token digests are accepted now. New/changed passwords need at least 6 characters and at most 72 UTF-8 bytes (bcrypt limit); existing passwords can still sign in.
 
 ## Controls
 

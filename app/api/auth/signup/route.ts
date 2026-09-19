@@ -24,7 +24,7 @@ export async function POST(req: Request) {
     const email = normalizedEmail(form.get('email'))
     const password = form.get('password')
     if (!firstName || !lastName || firstName.length > 100 || lastName.length > 100 || !email) throw new RequestError('กรุณาตรวจสอบชื่อ นามสกุล และอีเมล')
-    if (!validPassword(password)) throw new RequestError('รหัสผ่านต้องมีอย่างน้อย 12 ตัวอักษร และไม่เกิน 72 ไบต์')
+    if (!validPassword(password)) throw new RequestError('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร และไม่เกิน 72 ไบต์')
     await rateLimit('signup-email', email, 3, 3_600_000)
     const existing = await prisma.user.findUnique({ where: { email }, select: { id: true } })
     if (existing) throw new RequestError('ไม่สามารถสมัครด้วยข้อมูลนี้ได้ กรุณาเข้าสู่ระบบหรือใช้เมนูลืมรหัสผ่าน')

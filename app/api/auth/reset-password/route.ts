@@ -11,7 +11,7 @@ export async function POST(req: Request) {
     await rateLimit('reset-global', 'all', 100, 60_000)
     const { token, password } = await readJson(req)
     if (!validResetToken(token)) throw new RequestError('รหัสยืนยันไม่ถูกต้องหรือหมดอายุแล้ว')
-    if (!validPassword(password)) throw new RequestError('รหัสผ่านต้องมีอย่างน้อย 12 ตัวอักษร และไม่เกิน 72 ไบต์')
+    if (!validPassword(password)) throw new RequestError('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร และไม่เกิน 72 ไบต์')
     const digest = createHash('sha256').update(token).digest('hex')
     await rateLimit('reset-token', digest, 5, 900_000)
     const user = await prisma.user.findFirst({ where: { resetToken: digest, resetTokenExpiresAt: { gt: new Date() } }, select: { id: true } })
