@@ -42,13 +42,13 @@ export default function TambonPicker({ value, onChange }: { value: Geo; onChange
       onInputValueChange={(v) => setSearch(v)}
       itemToStringLabel={(t) => `ต.${t.TAMBON_T} · อ.${t.AMPHOE_T} · จ.${t.CHANGWAT_T}`}
     >
-      <Combobox.Input placeholder="พิมพ์ชื่อตำบล / อำเภอ / จังหวัด (อย่างน้อย 2 ตัวอักษร)" className={inputCls} />
+      <Combobox.Input placeholder="พิมพ์ชื่อตำบล เว้นวรรคตามด้วยอำเภอ/จังหวัด เช่น หนองบัว ศีขรภูมิ" className={inputCls} />
       <Combobox.Portal>
         {/* z สูงกว่า Dialog (z-50) — ตัวเลือกนี้ถูกใช้ในกล่อง "กำหนดพื้นที่" ด้วย ถ้าต่ำกว่าจะจมใต้ backdrop */}
         <Combobox.Positioner sideOffset={4} className="z-[60] w-[var(--anchor-width)]">
           <Combobox.Popup className="max-h-60 w-full overflow-auto rounded-lg border border-gray-200 bg-white shadow-lg outline-none">
             <Combobox.Empty className="px-3 py-2 text-sm text-gray-400">
-              {search.length >= 2 ? 'ไม่พบตำบลที่ค้นหา' : 'พิมพ์อย่างน้อย 2 ตัวอักษร'}
+              {search.trim().length >= 2 ? 'ไม่พบตำบลที่ค้นหา' : 'พิมพ์อย่างน้อย 2 ตัวอักษร'}
             </Combobox.Empty>
             <Combobox.List>
               {(t: TambonEntry, i: number) => (
