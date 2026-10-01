@@ -68,8 +68,11 @@ export default function MapView({ stats }: { stats: ProvinceStat[] }) {
         zoomSnap: 0.25,
       }).setView([13.5, 101], 6)
       L.control.zoom({ position: 'bottomright' }).addTo(map)
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      // OSM บล็อก (403 "Access blocked") request ที่ไม่มี Referer — next.config ตั้ง
+      // Referrer-Policy: same-origin ทั้งเว็บ จึงต้อง override เฉพาะ tile ให้ส่ง origin ไปด้วย
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 18,
+        referrerPolicy: 'strict-origin-when-cross-origin',
         opacity: 0.35, // จางไว้ให้สี polygon เด่น แต่ยังเห็นภูมิประเทศเป็นบริบท
         attribution: '&copy; OpenStreetMap contributors',
       }).addTo(map)
@@ -156,7 +159,11 @@ export default function MapView({ stats }: { stats: ProvinceStat[] }) {
       if (!map) return
       labelsRef.current.forEach((m) => m.remove())
       labelsRef.current = []
-      byProvince.forEach((s, province) => {
+      // วางจากจังหวัดที่ค่ามากก่อน แล้วซ่อนชื่อที่จะทับกล่องชื่อที่วางไปแล้ว (เหลือแค่ตัวเลข)
+      // เช่น นครราชสีมา/บุรีรัมย์/สุรินทร์ ที่ระดับซูมทั้งประเทศ
+      const placed: { x1: number; y1: number; x2: number; y2: number }[] = []
+      const entries = [...byProvince.entries()].sort((a, b) => b[1][metric] - a[1][metric])
+      entries.forEach(([province, s]) => {
         const value = s[metric]
         if (value <= 0) return
         const center = centersRef.current.get(province)
@@ -170,7 +177,17 @@ export default function MapView({ stats }: { stats: ProvinceStat[] }) {
           map.latLngToContainerPoint(bounds.getNorthWest()).x
         // 26px คือจุดที่วัดจากของจริง: ระดับซูมทั้งประเทศจังหวัดใหญ่กว้างราว 30px+ (ได้ชื่อ)
         // ส่วนกรุงเทพฯ/อยุธยา ~12-15px (เหลือแค่ตัวเลข) แล้วค่อยมีชื่อเมื่อซูมเข้าไป
-        const showName = widthPx >= 26
+        let showName = widthPx >= 26
+        if (showName) {
+          const p = map.latLngToContainerPoint(center)
+          const w = province.length * 6.5 + 4 // ประมาณความกว้างตัวอักษรไทย 11px
+          const box = { x1: p.x - w / 2, y1: p.y - 16, x2: p.x + w / 2, y2: p.y }
+          if (placed.some((b) => box.x1 < b.x2 && box.x2 > b.x1 && box.y1 < b.y2 && box.y2 > b.y1)) {
+            showName = false
+          } else {
+            placed.push(box)
+          }
+        }
 
         const dark = isDarkStep(value, max)
         const marker = L.marker(center, {
