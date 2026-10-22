@@ -8,20 +8,23 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Map as LeafletMap, GeoJSON as GeoJSONLayer, LatLngBounds, Marker, Path } from 'leaflet'
-import { Expand, MapPin, Maximize2, Shrink, Search, X, ArrowUpRight, MousePointer2, Layers, CheckCheck, ClipboardList, CircleCheck } from 'lucide-react'
+import { Expand, MapPin, Maximize2, Shrink, Search, X, ArrowUpRight, MousePointer2, Layers, CheckCheck, ClipboardList, CircleCheck, Wine, LayoutDashboard } from 'lucide-react'
 import Link from 'next/link'
 import { PROVINCE_ZONE } from '@/app/lib/province-zone'
 import 'leaflet/dist/leaflet.css'
 import thailandGeo from '@/app/data/thailand.json'
-import { HEAT_EMPTY, HEAT_RAMP, heatColor, isDarkStep, type ProvinceStat } from '@/app/lib/map-heat'
+import { HEAT_EMPTY, HEAT_RAMP, emptyProvinceStat, heatColor, isDarkStep, type ProvinceStat } from '@/app/lib/map-heat'
+import { DRINK_GROUPS, emptyDrinkCounts } from '@/app/lib/drink-groups'
+import DrinkProfile from './DrinkProfile'
 
 export type { ProvinceStat }
 
-type Metric = 'total' | 'eligible' | 'verified'
+type Metric = 'total' | 'eligible' | 'verified' | 'drinkers'
 const METRICS = [
   { value: 'total', label: 'ทั้งหมด', icon: ClipboardList },
   { value: 'eligible', label: 'เข้าเกณฑ์', icon: CircleCheck },
   { value: 'verified', label: 'ตรวจสอบแล้ว', icon: CheckCheck },
+  { value: 'drinkers', label: 'ผู้ดื่ม', icon: Wine },
 ] as const
 const PROVINCES = thailandGeo.features.map(f => f.properties.name_th).sort((a, b) => a.localeCompare(b, 'th'))
 
@@ -47,10 +50,16 @@ export default function MapView({ stats }: { stats: ProvinceStat[] }) {
 
   const byProvince = useMemo(() => new Map(stats.map((s) => [s.province, s])), [stats])
   const max = useMemo(() => Math.max(1, ...stats.map((s) => s[metric])), [stats, metric])
-  const ranked = useMemo(() => PROVINCES.map(province => byProvince.get(province) ?? { province, total: 0, eligible: 0, verified: 0 })
+  const ranked = useMemo(() => PROVINCES.map(province => byProvince.get(province) ?? emptyProvinceStat(province))
     .filter(s => s.province.includes(query.trim()) && (!zone || PROVINCE_ZONE[s.province] === zone) && (coverage === 'all' || (coverage === 'with' ? s[metric] > 0 : s[metric] === 0)))
     .sort((a, b) => b[metric] - a[metric] || a.province.localeCompare(b.province, 'th')), [byProvince, query, zone, coverage, metric])
   const metricLabel = METRICS.find(m => m.value === metric)!.label
+  // ค่าอ้างอิงทั้งประเทศ ให้แผงจังหวัดบอกได้ว่าสูง/ต่ำกว่าภาพรวม
+  const national = useMemo(() => {
+    const c = emptyDrinkCounts()
+    for (const s of stats) for (const g of DRINK_GROUPS) c[g] += s.drink[g]
+    return c
+  }, [stats])
 
 
   // สร้างแผนที่ครั้งเดียว
@@ -134,7 +143,7 @@ export default function MapView({ stats }: { stats: ProvinceStat[] }) {
         const s = byProvince.get(name)
         layer.getTooltip()?.setContent(
           s
-            ? `<b>${name}</b><br/>${s.total.toLocaleString()} ชิ้นงาน · เข้าเกณฑ์ ${s.eligible.toLocaleString()} · ตรวจสอบแล้ว ${s.verified.toLocaleString()}`
+            ? `<b>${name}</b><br/>${s.total.toLocaleString()} ชิ้นงาน · เข้าเกณฑ์ ${s.eligible.toLocaleString()} · ตรวจสอบแล้ว ${s.verified.toLocaleString()}<br/>ผู้ดื่ม ${s.drinkers.toLocaleString()} คน`
             : `<b>${name}</b><br/>ยังไม่มีข้อมูล`,
         )
       })
@@ -248,7 +257,7 @@ export default function MapView({ stats }: { stats: ProvinceStat[] }) {
     if (fullBoundsRef.current) map.fitBounds(fullBoundsRef.current, { padding: [16, 16] })
   }, [mapReady, selected])
 
-  const selectedStat = selected ? byProvince.get(selected) ?? { province: selected, total: 0, eligible: 0, verified: 0 } : undefined
+  const selectedStat = selected ? byProvince.get(selected) ?? emptyProvinceStat(selected) : undefined
 
   return (
     <div className={fullscreen
@@ -272,7 +281,7 @@ export default function MapView({ stats }: { stats: ProvinceStat[] }) {
             <div className="absolute left-3 top-3 z-[500] max-w-[calc(100%-1.5rem)] rounded-xl border border-gray-100 bg-white/95 px-3 py-2 shadow-sm backdrop-blur"><p className="flex items-center gap-2 text-xs font-medium text-gray-700"><Layers aria-hidden="true" className="size-4 text-green-600" />{selected || 'ภาพรวมประเทศไทย'}<span className="text-gray-400">· {metricLabel}</span></p></div>
           </div>
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 px-4 py-3">
-            <div><p className="mb-1.5 text-xs font-medium text-gray-600">จำนวนแบบสอบถาม · {metricLabel}</p><div className="flex flex-wrap items-center gap-1 text-[10px] text-gray-500"><span className="mr-1">น้อย</span>{HEAT_RAMP.map(c => <span key={c} className="h-2.5 w-6 rounded-sm" style={{ backgroundColor: c }} />)}<span className="ml-1">มาก (สูงสุด {max === 1 && !stats.some(s => s[metric] > 0) ? 0 : max.toLocaleString()})</span><span className="ml-3 h-2.5 w-3 rounded-sm border border-gray-200" style={{ backgroundColor: HEAT_EMPTY }} /><span>0 รายการ</span></div></div>
+            <div><p className="mb-1.5 text-xs font-medium text-gray-600">{metric === 'drinkers' ? 'จำนวนผู้ดื่ม (เฉพาะผู้เข้าเกณฑ์)' : `จำนวนแบบสอบถาม · ${metricLabel}`}</p><div className="flex flex-wrap items-center gap-1 text-[10px] text-gray-500"><span className="mr-1">น้อย</span>{HEAT_RAMP.map(c => <span key={c} className="h-2.5 w-6 rounded-sm" style={{ backgroundColor: c }} />)}<span className="ml-1">มาก (สูงสุด {max === 1 && !stats.some(s => s[metric] > 0) ? 0 : max.toLocaleString()})</span><span className="ml-3 h-2.5 w-3 rounded-sm border border-gray-200" style={{ backgroundColor: HEAT_EMPTY }} /><span>0 รายการ</span></div></div>
             <p className="flex items-center gap-1.5 text-[11px] text-gray-400"><MousePointer2 aria-hidden="true" className="size-3.5" />คลิกจังหวัดเพื่อดูรายละเอียด</p>
           </div>
         </section>
@@ -280,8 +289,14 @@ export default function MapView({ stats }: { stats: ProvinceStat[] }) {
           <section aria-label="รายละเอียดจังหวัด" aria-live="polite" className="rounded-2xl border border-green-100 bg-green-50/60 p-4">
             {selectedStat ? <>
               <div className="flex items-start justify-between gap-2"><div><p className="mb-1 text-xs text-green-700">จังหวัดที่เลือก · {PROVINCE_ZONE[selectedStat.province] ? `ภาค${PROVINCE_ZONE[selectedStat.province]}` : 'ไม่ระบุภาค'}</p><h2 className="text-lg font-semibold text-gray-800">{selectedStat.province}</h2></div><button aria-label="ยกเลิกเลือกจังหวัด" onClick={() => setSelected('')} className="rounded-lg p-2 text-green-700 hover:bg-green-100"><X className="size-4" /></button></div>
-              <dl className="mt-4 grid grid-cols-3 gap-2">{METRICS.map(({ value, label }) => <div key={value} className="rounded-xl bg-white p-2.5"><dt className="text-[10px] text-gray-500">{label}</dt><dd className="mt-1 text-lg font-semibold tabular-nums text-gray-800">{selectedStat[value].toLocaleString()}</dd></div>)}</dl>
-              {selectedStat.total > 0 ? <Link href={`/dashboard/surveys?province=${encodeURIComponent(selectedStat.province)}`} className="mt-4 flex min-h-10 items-center justify-center gap-2 rounded-xl bg-green-600 px-3 text-sm font-medium text-white hover:bg-green-700">ดูแบบสอบถามในจังหวัด<ArrowUpRight aria-hidden="true" className="size-4" /></Link> : <p className="mt-3 text-xs text-gray-500">จังหวัดนี้ยังไม่มีข้อมูลแบบสอบถาม</p>}
+              <dl className="mt-4 grid grid-cols-3 gap-2">{METRICS.filter(m => m.value !== 'drinkers').map(({ value, label }) => <div key={value} className="rounded-xl bg-white p-2.5"><dt className="text-[10px] text-gray-500">{label}</dt><dd className="mt-1 text-lg font-semibold tabular-nums text-gray-800">{selectedStat[value].toLocaleString()}</dd></div>)}</dl>
+              {selectedStat.total > 0 ? <>
+                <DrinkProfile drink={selectedStat.drink} national={national} />
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                  <Link href={`/dashboard?province=${encodeURIComponent(selectedStat.province)}`} className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl bg-green-600 px-3 text-sm font-medium text-white hover:bg-green-700"><LayoutDashboard aria-hidden="true" className="size-4" />ภาพรวมจังหวัด</Link>
+                  <Link href={`/dashboard/surveys?province=${encodeURIComponent(selectedStat.province)}`} className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl border border-green-200 bg-white px-3 text-sm font-medium text-green-700 hover:bg-green-50">แบบสอบถาม<ArrowUpRight aria-hidden="true" className="size-4" /></Link>
+                </div>
+              </> : <p className="mt-3 text-xs text-gray-500">จังหวัดนี้ยังไม่มีข้อมูลแบบสอบถาม</p>}
             </> : <div className="flex items-start gap-3"><span className="rounded-xl bg-white p-2.5 text-green-600"><MapPin aria-hidden="true" className="size-5" /></span><div><h2 className="text-sm font-semibold text-gray-800">สำรวจข้อมูลรายจังหวัด</h2><p className="mt-1 text-xs leading-relaxed text-gray-500">เลือกพื้นที่บนแผนที่หรือจากรายชื่อ เพื่อดูสรุปและเปิดแบบสอบถามของจังหวัดนั้น</p></div></div>}
           </section>
           <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-gray-200/80 bg-white shadow-sm">

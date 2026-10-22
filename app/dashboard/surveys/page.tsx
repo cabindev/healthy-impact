@@ -9,6 +9,8 @@ import SurveyTable, { type SurveyRow } from './SurveyTable'
 import Pagination from './Pagination'
 import AssignCreatorDialog, { type AdminChoice } from './AssignCreatorDialog'
 import { buildSurveyWhere } from '@/app/lib/survey-filters'
+import { getDrinkSummary, nextLevel } from '@/app/lib/drink-summary'
+import DrinkSummaryTable from './DrinkSummaryTable'
 
 export const dynamic = 'force-dynamic'
 
@@ -68,10 +70,11 @@ export default async function SurveysPage({ searchParams }: { searchParams: Prom
   }))
 
   // นับรายการที่ยังไม่ระบุพื้นที่ทั้งระบบ — ข้อมูลเก่าก่อนบังคับกรอกพื้นที่ ต้องไล่เติมย้อนหลัง
-  const [noAreaCount, eligibleCount, verifiedCount] = await Promise.all([
+  const [noAreaCount, eligibleCount, verifiedCount, drinkSummary] = await Promise.all([
     prisma.survey.count({ where: { OR: [{ province: null }, { province: '' }] } }),
     prisma.survey.count({ where: { AND: [where, { eligible: true }] } }),
     prisma.survey.count({ where: { AND: [where, { verifiedAt: { not: null } }] } }),
+    getDrinkSummary(where, nextLevel({ province, amphoe, tambon })),
   ])
   const combos: GeoCombo[] = geoCombos
 
@@ -182,6 +185,8 @@ export default async function SurveysPage({ searchParams }: { searchParams: Prom
           />
         </div>
       )}
+      {!noArea && <DrinkSummaryTable summary={drinkSummary} filterQuery={filterQuery} />}
+
       {/* ล้างรายการที่เลือกเมื่อเปลี่ยนหน้า ตัวกรอง หรือชุดข้อมูล */}
       <SurveyTable key={`${page}-${filterQuery}-${rows.map(r => r.id).join(',')}`} rows={rows} q={q} filterQuery={filterQuery} offset={offset} total={total} />
       <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-gray-500 print:hidden"><p>หน้า {page.toLocaleString()} จาก {pageCount.toLocaleString()} · หน้าละ {PAGE_SIZE} รายการ</p><Pagination page={page} pageCount={pageCount} params={filterQuery} /></div>

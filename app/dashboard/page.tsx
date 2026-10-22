@@ -1,28 +1,27 @@
 import { requireAdminPage } from '@/app/lib/auth'
 import { prisma } from '@/app/lib/prisma'
 import { thaiAge, calcBMI, bmiCategory } from '@/app/lib/health'
-import { DatabaseZap } from 'lucide-react'
-import DashboardCharts, { type ChartsData, TrendHeatmap, BmiMini } from './components/DashboardCharts'
-import type { ProvinceStat } from '@/app/lib/map-heat'
+import { DatabaseZap, X } from 'lucide-react'
+import Link from 'next/link'
+import { TrendHeatmap, BarVertical, BarHorizontal } from './components/DashboardCharts'
+import DashboardMiniMap from './components/DashboardMiniMap'
+import { Panel, RateCard, SectionHeading, ShareBar, pct, type Share } from './components/DashboardStats'
+import ProvinceSelect, { type ProvinceOption } from './components/ProvinceSelect'
+import { buildProvinceStats } from '@/app/lib/map-heat'
+import { DRINK_COLOR, DRINK_GROUPS, drinkGroupOf } from '@/app/lib/drink-groups'
+import { RISK_BANDS } from '@/app/lib/audit'
+import { PROVINCE_ZONE } from '@/app/lib/province-zone'
 import { tallyIneligible } from '@/app/lib/eligibility'
 import EligibilityTip from '@/app/components/EligibilityTip'
 
 export const dynamic = 'force-dynamic'
 
-const SITE_LABEL: Record<string, string> = { VILLAGE: 'หมู่บ้าน', WORKPLACE: 'สถานประกอบการ', SCHOOL: 'สถานศึกษา' }
-// โทนเขียว–ดำ–เทา: ไล่เฉดเขียว→เข้ม→ดำ ตามความรุนแรง, เทาสำหรับกลุ่มกลาง
-const RISK_COLOR: Record<string, string> = {
-  'ไม่ดื่ม': '#9CA3AF',           // เทา
-  'ผู้ดื่มแบบเสี่ยงต่ำ': '#86EFAC', // เขียวอ่อน
-  'ผู้ดื่มแบบเสี่ยง': '#22C55E',    // เขียว
-  'ผู้ดื่มแบบอันตราย': '#15803D',   // เขียวเข้ม
-  'ผู้ดื่มแบบติด': '#111827',       // ดำ (รุนแรงสุด)
-}
 const GENDER_COLOR: Record<string, string> = { 'ชาย': '#15803D', 'หญิง': '#4ADE80', 'อื่นๆ': '#9CA3AF' }
 const BMI_COLOR: Record<string, string> = {
   'น้ำหนักน้อย': '#9CA3AF', 'ปกติ': '#16A34A', 'ท้วม': '#6B7280', 'อ้วน': '#374151', 'อ้วนมาก': '#111827',
 }
 const AGE_COLOR = ['#BBF7D0', '#4ADE80', '#22C55E', '#16A34A', '#15803D'] // ไล่เฉดเขียวตามอายุ
+const SMOKE_COLOR: Record<string, string> = { 'สูบปัจจุบัน': '#111827', 'เคยสูบ/เลิกแล้ว': '#9CA3AF', 'ไม่เคยสูบ': '#16A34A' }
 
 function ageGroup(age: number | null): string | null {
   if (age == null) return null
@@ -52,11 +51,28 @@ async function loadSurveys() {
   })
 }
 
-export default async function DashboardHome() {
+// ตัวชี้วัดผลกระทบ (ส่วนที่ 2–4) — นับเฉพาะผู้เข้าเกณฑ์; แยกเป็นฟังก์ชันเพื่อคำนวณภาพรวมประเทศมาเทียบได้
+function impactOf(rows: SurveyRows) {
+  const eligible = rows.filter((s) => s.eligible)
+  const groups = eligible.map((s) => drinkGroupOf(s.alcohol))
+  const drinkers = groups.filter((g) => g && g !== 'ไม่ดื่ม').length
+  return {
+    eligible: eligible.length,
+    drinkers,
+    // AUDIT ≥ 8 = เสี่ยง + อันตราย + ติด
+    highRisk: groups.filter((g) => g === 'ผู้ดื่มแบบเสี่ยง' || g === 'ผู้ดื่มแบบอันตราย' || g === 'ผู้ดื่มแบบติด').length,
+    smokers: eligible.filter((s) => ['1', '2'].includes(s.tobacco?.smokeStatus ?? '')).length,
+    // 4.1 ดื่มและเคยขับ (ตัวเลือก 2–4) — คิดเป็น % ของผู้ดื่ม เพราะคนไม่ดื่มไม่มีโอกาสเมาแล้วขับ
+    drinkDrive: eligible.filter((s) => ['2', '3', '4'].includes(s.ddDroveAfterDrink ?? '')).length,
+  }
+}
+
+export default async function DashboardHome({ searchParams }: { searchParams: Promise<{ province?: string }> }) {
   await requireAdminPage()
-  let surveys: SurveyRows
+  const selectedProvince = (await searchParams).province?.trim() ?? ''
+  let allSurveys: SurveyRows
   try {
-    surveys = await loadSurveys()
+    allSurveys = await loadSurveys()
   } catch (err) {
     console.warn('[dashboard] เชื่อมต่อฐานข้อมูลไม่ได้:', err instanceof Error ? err.message : err)
     return (
@@ -76,47 +92,42 @@ export default async function DashboardHome() {
     )
   }
 
+  // เลือกจังหวัด → ทุกอย่างเป็นของจังหวัดนั้น เทียบกับภาพรวมประเทศ; แผนที่ย่อยังใช้ทั้งประเทศเพื่อเป็นบริบท
+  // ตัวเลือกครบ 77 จังหวัด (มีข้อมูลขึ้นก่อน เรียงมาก→น้อย) — นับทุกใบให้ตรงกับแผนที่
+  const provCount = new Map<string, number>()
+  for (const s of allSurveys) { const p = s.province?.trim(); if (p) provCount.set(p, (provCount.get(p) ?? 0) + 1) }
+  const provinceOptions: ProvinceOption[] = Object.entries(PROVINCE_ZONE)
+    .map(([name, zone]) => ({ name, zone, count: provCount.get(name) ?? 0 }))
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'th'))
+  const surveys = selectedProvince ? allSurveys.filter((s) => s.province?.trim() === selectedProvince) : allSurveys
+
   const eligible = surveys.filter((s) => s.eligible)
   const ineligibleCount = surveys.length - eligible.length
+  const verifiedCount = surveys.filter((s) => s.verifiedAt).length
   // แยกเหตุคัดออก เพื่อให้เจ้าหน้าที่เห็นว่าที่สัมภาษณ์ไม่จบเป็นเพราะอะไรบ้าง
   const ineligibleReasons = tallyIneligible(surveys.filter((s) => !s.eligible).map((s) => s.ineligibleReason))
 
-  // KPI
-  const smokers = eligible.filter((s) => s.tobacco && ['1', '2'].includes(s.tobacco.smokeStatus ?? '')).length
-  const drinkers = eligible.filter((s) => (s.alcohol?.q1Frequency ?? 0) > 0).length
-  const highRisk = eligible.filter((s) => (s.alcohol?.auditScore ?? 0) >= 8).length
-  const drinkDrive = eligible.filter((s) => ['2', '3', '4'].includes(s.ddDroveAfterDrink ?? '')).length
+  // ── ① ผลกระทบ ──
+  const k = impactOf(surveys)
+  const nat = selectedProvince ? impactOf(allSurveys) : null
+  const cmp = (n: number, base: number) => (nat ? pct(n, base) : undefined)
 
-  const cards: { label: string; value: number; hint?: string }[] = [
-    { label: 'แบบสอบถามทั้งหมด', value: surveys.length },
-    { label: 'เข้าเกณฑ์', value: eligible.length, hint: `ไม่เข้าเกณฑ์ ${ineligibleCount.toLocaleString()}` },
-    { label: 'สูบบุหรี่ปัจจุบัน', value: smokers },
-    { label: 'ดื่มแอลกอฮอล์', value: drinkers },
-    { label: 'เสี่ยงสูง (AUDIT ≥ 8)', value: highRisk },
-    { label: 'เคยเมาแล้วขับ', value: drinkDrive },
-  ]
-
-  // ── charts ──
-  const riskOrder = ['ไม่ดื่ม', 'ผู้ดื่มแบบเสี่ยงต่ำ', 'ผู้ดื่มแบบเสี่ยง', 'ผู้ดื่มแบบอันตราย', 'ผู้ดื่มแบบติด']
-  const risk = tally(
-    eligible.map((s) => (!s.alcohol || (s.alcohol.q1Frequency ?? 0) === 0 ? 'ไม่ดื่ม' : s.alcohol.riskLevel)),
-    riskOrder,
-  ).filter((d) => d.value > 0).map((d) => ({ ...d, color: RISK_COLOR[d.name] }))
+  const auditRange = Object.fromEntries(RISK_BANDS.map((b) => [b.level, `AUDIT ${b.range}`]))
+  const risk: Share[] = tally(eligible.map((s) => drinkGroupOf(s.alcohol)), [...DRINK_GROUPS])
+    .map((d) => ({ ...d, color: DRINK_COLOR[d.name as keyof typeof DRINK_COLOR], hint: auditRange[d.name] }))
 
   const smokeBucket = (st?: string | null) =>
     st === '1' || st === '2' ? 'สูบปัจจุบัน' : st === '6' ? 'ไม่เคยสูบ' : st ? 'เคยสูบ/เลิกแล้ว' : null
-  const SMOKE_COLOR: Record<string, string> = { 'สูบปัจจุบัน': '#111827', 'เคยสูบ/เลิกแล้ว': '#9CA3AF', 'ไม่เคยสูบ': '#16A34A' }
-  const smoke = tally(eligible.map((s) => smokeBucket(s.tobacco?.smokeStatus)), ['สูบปัจจุบัน', 'เคยสูบ/เลิกแล้ว', 'ไม่เคยสูบ'])
+  const smoke: Share[] = tally(eligible.map((s) => smokeBucket(s.tobacco?.smokeStatus)), ['สูบปัจจุบัน', 'เคยสูบ/เลิกแล้ว', 'ไม่เคยสูบ'])
     .map((d) => ({ ...d, color: SMOKE_COLOR[d.name] }))
 
-  const site = tally(eligible.map((s) => SITE_LABEL[s.siteType]), ['หมู่บ้าน', 'สถานประกอบการ', 'สถานศึกษา'])
+  // ── ② ผู้ตอบ ──
+  const genderBucket = (g?: string | null) => (g === 'ชาย' ? 'ชาย' : g === 'หญิง' ? 'หญิง' : g ? 'อื่นๆ' : null)
+  const gender: Share[] = tally(eligible.map((s) => genderBucket(s.gender)), ['ชาย', 'หญิง', 'อื่นๆ'])
+    .filter((d) => d.value > 0).map((d) => ({ ...d, color: GENDER_COLOR[d.name] }))
 
   const age = tally(eligible.map((s) => ageGroup(thaiAge(s.birthDate))), ['15–24', '25–34', '35–44', '45–59', '60+'])
     .map((d, i) => ({ ...d, color: AGE_COLOR[i] }))
-
-  const genderBucket = (g?: string | null) => (g === 'ชาย' ? 'ชาย' : g === 'หญิง' ? 'หญิง' : g ? 'อื่นๆ' : null)
-  const gender = tally(eligible.map((s) => genderBucket(s.gender)), ['ชาย', 'หญิง', 'อื่นๆ'])
-    .filter((d) => d.value > 0).map((d) => ({ ...d, color: GENDER_COLOR[d.name] }))
 
   const bmi = tally(
     eligible.map((s) => {
@@ -126,13 +137,16 @@ export default async function DashboardHome() {
     ['น้ำหนักน้อย', 'ปกติ', 'ท้วม', 'อ้วน', 'อ้วนมาก'],
   ).map((d) => ({ ...d, color: BMI_COLOR[d.name] }))
 
-  // province — เรียงมาก→น้อย เอา top 8
-  const provMap = new Map<string, number>()
-  for (const s of eligible) if (s.province) provMap.set(s.province, (provMap.get(s.province) ?? 0) + 1)
-  const province = [...provMap.entries()].map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value).slice(0, 8)
+  // ── ③ การดำเนินงาน ──
+  // พื้นที่ — เรียงมาก→น้อย เอา top 8; เลือกจังหวัดแล้วแตกเป็นอำเภอแทน
+  const areaLabel = selectedProvince ? 'อำเภอ' : 'จังหวัด'
+  const areaOf = (s: SurveyRows[number]) => (selectedProvince ? s.amphoe?.trim() : s.province?.trim())
+  const areaMap = new Map<string, number>()
+  for (const s of eligible) { const a = areaOf(s); if (a) areaMap.set(a, (areaMap.get(a) ?? 0) + 1) }
+  const area = [...areaMap.entries()].map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value).slice(0, 8)
 
-  // trend รายวัน — ช่วง 180 วันล่าสุดแบบต่อเนื่อง (รวมวันที่ count=0) สำหรับ heatmap
-  const TREND_DAYS = 180
+  // trend รายวัน — ย้อนหลัง 1 ปีแบบต่อเนื่อง (รวมวันที่ count=0) สำหรับ heatmap เต็มความกว้างหน้า
+  const TREND_DAYS = 364
   const iso = (d: Date) =>
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   const dayCount = new Map<string, number>()
@@ -147,73 +161,123 @@ export default async function DashboardHome() {
   })
 
   // สถิติรายจังหวัดสำหรับแผนที่ย่อ — นับทุกใบรวมที่ไม่เข้าเกณฑ์ ให้ตรงกับหน้าแผนที่เต็ม
-  const provMapAll = new Map<string, ProvinceStat>()
-  for (const s2 of surveys) {
-    const name = s2.province?.trim()
-    if (!name) continue
-    const stat = provMapAll.get(name) ?? { province: name, total: 0, eligible: 0, verified: 0 }
-    stat.total += 1
-    if (s2.eligible) stat.eligible += 1
-    if (s2.verifiedAt) stat.verified += 1
-    provMapAll.set(name, stat)
-  }
-  const provinceStats = [...provMapAll.values()]
-
-  const charts: ChartsData = { risk, smoke, site, age, province, trend, gender, bmi }
+  const provinceStats = buildProvinceStats(allSurveys)
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-semibold text-gray-800">ภาพรวม</h1>
-        <p className="text-sm text-gray-400 mt-0.5">
-          สรุปข้อมูลผลกระทบด้านสุขภาวะ · {surveys.length.toLocaleString()} รายการ
-          {ineligibleCount > 0 && <span className="text-gray-400"> (ไม่เข้าเกณฑ์ {ineligibleCount})</span>}
-        </p>
-      </div>
-
-      {/* แผงสรุปแบบ Claude: stat boxes + heatmap ในกล่องเทาเดียว */}
-      <div className="bg-gray-100/70 rounded-2xl p-4 sm:p-5 space-y-4">
-        <div className="grid grid-cols-2 lg:grid-cols-3 gap-2.5">
-          {cards.map(({ label, value, hint }) => (
-            <div key={label} className="bg-gray-200/60 rounded-xl px-4 py-3">
-              <span className="block text-[13px] text-gray-500 truncate">{label}</span>
-              <p className="mt-0.5 text-2xl font-bold text-gray-900">{value.toLocaleString()}</p>
-              {hint && <span className="block text-xs text-gray-500 mt-0.5 truncate">{hint}</span>}
-            </div>
-          ))}
+    <div className="space-y-8">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold text-gray-800">
+            ภาพรวม{selectedProvince && <span className="text-green-700"> · จังหวัด{selectedProvince}</span>}
+          </h1>
+          <p className="text-sm text-gray-400 mt-0.5">
+            {selectedProvince && PROVINCE_ZONE[selectedProvince] ? `ภาค${PROVINCE_ZONE[selectedProvince]} · ` : ''}
+            สรุปข้อมูลผลกระทบด้านสุขภาวะ · {surveys.length.toLocaleString()} แบบสอบถาม
+            {selectedProvince && ' · เทียบกับภาพรวมทุกจังหวัด'}
+          </p>
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 items-start">
-          <div className="lg:col-span-3">
-            <TrendHeatmap data={trend} />
-          </div>
-          <div className="lg:col-span-2">
-            <BmiMini data={bmi} />
-          </div>
-        </div>
-        <p className="text-[13px] text-gray-400">
-          เก็บข้อมูล {trend.reduce((s, d) => s + d.count, 0).toLocaleString()} แบบสอบถามในช่วง 180 วันล่าสุด
-        </p>
-
-        {/* เหตุที่สัมภาษณ์ไม่จบ — เห็นได้ทันทีโดยไม่ต้องเปิดทีละรายการ */}
-        <div className="flex flex-wrap items-center gap-2 pt-1">
-          <span className="inline-flex items-center gap-1 text-[13px] text-gray-500">
-            คัดออก {ineligibleCount.toLocaleString()} ราย <EligibilityTip />
-          </span>
-          {ineligibleReasons.map((r) => (
-            <span key={r.key} className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-white text-gray-600 border border-gray-200">
-              {r.label} <b className="tabular-nums text-gray-900">{r.count.toLocaleString()}</b>
-            </span>
-          ))}
-          {ineligibleCount === 0 && <span className="text-xs text-gray-400">ยังไม่มีรายการที่ถูกคัดออก</span>}
+        <div className="flex items-center gap-2">
+          <ProvinceSelect value={selectedProvince} options={provinceOptions} />
+          {selectedProvince && (
+            <Link href="/dashboard" className="inline-flex min-h-10 items-center gap-1 rounded-lg px-2.5 text-xs font-medium text-gray-600 hover:bg-gray-100">
+              <X aria-hidden="true" className="size-3.5" /> ทั้งประเทศ
+            </Link>
+          )}
         </div>
       </div>
 
       {surveys.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-100 p-8 text-center text-sm text-gray-400">
-          ยังไม่มีข้อมูล — เริ่มที่เมนู <span className="font-medium text-gray-600">แบบสอบถาม</span>
+          {selectedProvince
+            ? <>จังหวัด{selectedProvince}ยังไม่มีแบบสอบถาม — <Link href="/dashboard" className="font-medium text-green-700 hover:underline">ดูทั้งประเทศ</Link></>
+            : <>ยังไม่มีข้อมูล — เริ่มที่เมนู <span className="font-medium text-gray-600">แบบสอบถาม</span></>}
         </div>
       ) : (
-        <DashboardCharts data={charts} provinceStats={provinceStats} />
+        <>
+          {/* ① ผลกระทบ — สิ่งที่ สสส. วัด: ความชุกเป็น % ไม่ใช่จำนวนคน */}
+          <section className="space-y-4">
+            <SectionHeading no="1" title="ผลกระทบด้านสุขภาวะ" sub={`ผู้เข้าเกณฑ์ ${k.eligible.toLocaleString()} คน`} />
+            <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+              <RateCard label="ดื่มแอลกอฮอล์" n={k.drinkers} base={k.eligible} baseLabel="คน"
+                compare={nat ? cmp(nat.drinkers, nat.eligible) : undefined} compareLabel="ภาพรวม" />
+              <RateCard label="ดื่มแบบเสี่ยงขึ้นไป (AUDIT ≥ 8)" n={k.highRisk} base={k.eligible} baseLabel="คน"
+                compare={nat ? cmp(nat.highRisk, nat.eligible) : undefined} compareLabel="ภาพรวม" />
+              <RateCard label="สูบบุหรี่ปัจจุบัน" n={k.smokers} base={k.eligible} baseLabel="คน"
+                compare={nat ? cmp(nat.smokers, nat.eligible) : undefined} compareLabel="ภาพรวม" />
+              <RateCard label="เมาแล้วขับ (12 เดือน)" n={k.drinkDrive} base={k.drinkers} baseLabel="ผู้ดื่ม"
+                compare={nat ? cmp(nat.drinkDrive, nat.drinkers) : undefined} compareLabel="ภาพรวม" />
+            </div>
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
+              <Panel title="ระดับความเสี่ยงการดื่ม (AUDIT)" sub="ตามเกณฑ์ WHO / ศวส. · จุดตัดผิดปกติ ≥ 8 คะแนน" className="lg:col-span-3">
+                <ShareBar items={risk} />
+              </Panel>
+              <Panel title="สถานะการสูบบุหรี่" className="lg:col-span-2">
+                <ShareBar items={smoke} />
+              </Panel>
+            </div>
+          </section>
+
+          {/* ② ผู้ตอบ */}
+          <section className="space-y-4">
+            <SectionHeading no="2" title="ผู้ตอบแบบสอบถาม" />
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+              <Panel title="เพศ">
+                <ShareBar items={gender} compact />
+              </Panel>
+              <Panel title="ช่วงอายุ">
+                <BarVertical data={age} distributed height={180} />
+              </Panel>
+              <Panel title="ดัชนีมวลกาย (BMI)" sub="เกณฑ์ Asia-Pacific">
+                <BarVertical data={bmi} distributed height={180} />
+              </Panel>
+            </div>
+          </section>
+
+          {/* ③ การดำเนินงาน */}
+          <section className="space-y-4">
+            <SectionHeading no="3" title="การดำเนินงานเก็บข้อมูล" />
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                {[
+                  { label: 'แบบสอบถามทั้งหมด', value: surveys.length },
+                  { label: 'เข้าเกณฑ์', value: eligible.length },
+                  { label: 'คัดออก', value: ineligibleCount },
+                  { label: 'ตรวจสอบแล้ว', value: verifiedCount, hint: `${Math.round(pct(verifiedCount, surveys.length))}%` },
+                ].map(({ label, value, hint }) => (
+                  <div key={label} className="rounded-xl bg-gray-100/80 px-4 py-3">
+                    <span className="block text-[13px] text-gray-500">{label}</span>
+                    <p className="mt-0.5 text-xl font-bold tabular-nums text-gray-900">
+                      {value.toLocaleString()}{hint && <span className="ml-1.5 text-xs font-normal text-gray-500">{hint}</span>}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              <Panel title="การเก็บข้อมูลรายวัน" sub={`${trend.reduce((s, d) => s + d.count, 0).toLocaleString()} แบบสอบถามในรอบ 1 ปีที่ผ่านมา`}>
+                <TrendHeatmap data={trend} />
+              </Panel>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1 text-[13px] text-gray-500">
+                เหตุคัดออก <EligibilityTip />
+              </span>
+              {ineligibleReasons.map((r) => (
+                <span key={r.key} className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-white text-gray-600 border border-gray-200">
+                  {r.label} <b className="tabular-nums text-gray-900">{r.count.toLocaleString()}</b>
+                </span>
+              ))}
+              {ineligibleCount === 0 && <span className="text-xs text-gray-400">ยังไม่มีรายการที่ถูกคัดออก</span>}
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <Panel title={`พื้นที่เก็บข้อมูล (${areaLabel})`} sub={`ผู้เข้าเกณฑ์ · ${areaLabel}ที่มากที่สุด 8 อันดับ`}>
+                <BarHorizontal data={area} color="#16A34A" />
+              </Panel>
+              <DashboardMiniMap stats={provinceStats} />
+            </div>
+          </section>
+        </>
       )}
     </div>
   )

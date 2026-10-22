@@ -1,28 +1,11 @@
 'use client'
 
-import { Bar, BarChart, CartesianGrid, Cell, Label, LabelList, Pie, PieChart, XAxis, YAxis } from 'recharts'
-import {
-  ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent, type ChartConfig,
-} from '@/app/components/ui/chart'
-import DashboardMiniMap from './DashboardMiniMap'
-import type { ProvinceStat } from '@/app/lib/map-heat'
+import { Fragment } from 'react'
+import { Bar, BarChart, CartesianGrid, Cell, LabelList, XAxis, YAxis } from 'recharts'
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/app/components/ui/chart'
 
 export type Named = { name: string; value: number; color?: string }
 export type Trend = { date: string; count: number }
-
-export interface ChartsData {
-  risk: Named[]
-  smoke: Named[]
-  site: Named[]
-  age: Named[]
-  province: Named[]
-  trend: Trend[]
-  gender: Named[]
-  bmi: Named[]
-}
-
-const toConfig = (arr: Named[]): ChartConfig =>
-  Object.fromEntries(arr.map((d) => [d.name, { label: d.name, color: d.color }]))
 
 // heatmap แบบ contribution-graph — โทนเขียวไล่เฉดตามจำนวนที่บันทึกต่อวัน
 const HEAT_COLORS = ['#E3E3E1', '#BBF7D0', '#4ADE80', '#16A34A', '#15803D']
@@ -57,157 +40,83 @@ export function TrendHeatmap({ data }: { data: Trend[] }) {
     return prev && prev.dt.getMonth() === first.dt.getMonth() ? '' : TH_MONTH[first.dt.getMonth()]
   })
 
+  // ช่องยืดเต็มความกว้างกล่อง (คอลัมน์ละ 1 สัปดาห์ ช่องสี่เหลี่ยมจัตุรัส) — เดิมล็อก 12px เหลือที่ว่างครึ่งกล่อง
+  // จอแคบ (มือถือ) ช่องไม่เล็กกว่า 10px แล้วเลื่อนแนวนอนแทน
   return (
-    <div className="overflow-x-auto">
-      <div className="inline-flex flex-col gap-[3px]">
-        {/* แถวป้ายเดือน */}
-        <div className="flex gap-[3px]">
-          <div className="w-7 shrink-0" />
-          {monthLabels.map((m, wi) => (
-            <div key={wi} className="w-3 shrink-0 text-[10px] leading-none text-gray-400 whitespace-nowrap">{m}</div>
-          ))}
-        </div>
-        {/* ป้ายวัน + ตารางสัปดาห์ */}
-        <div className="flex gap-[3px]">
-          <div className="w-7 shrink-0 flex flex-col gap-[3px]">
-            {DAY_LABEL.map((d, di) => (
-              <div key={di} className="h-3 text-[9px] leading-3 text-gray-400 text-right pr-1">{d}</div>
-            ))}
-          </div>
-          {weeks.map((week, wi) => (
-            <div key={wi} className="flex flex-col gap-[3px] shrink-0">
-              {Array.from({ length: 7 }).map((_, di) => {
-                const cell = week[di]
-                if (!cell) return <div key={di} className="w-3 h-3" />
-                const lv = heatLevel(cell.count, max)
-                const label = `${cell.dt.getDate()} ${TH_MONTH[cell.dt.getMonth()]} · ${cell.count} แบบสอบถาม`
-                return (
-                  <div
-                    key={di}
-                    title={label}
-                    className="w-3 h-3 rounded-[3px] ring-1 ring-black/[0.04]"
-                    style={{ background: HEAT_COLORS[lv] }}
-                  />
-                )
-              })}
-            </div>
-          ))}
-        </div>
+    <div className="w-full">
+      <div className="overflow-x-auto pb-1">
+      <div className="grid min-w-max gap-[3px] sm:min-w-0" style={{ gridTemplateColumns: `1.75rem repeat(${weeks.length}, minmax(10px, 1fr))` }}>
+        {/* แถวป้ายเดือน — ล้นไปทางขวาได้ เพราะคอลัมน์ถัดไปมักว่าง */}
+        <div />
+        {monthLabels.map((m, wi) => (
+          <div key={`m${wi}`} className="h-4 overflow-visible whitespace-nowrap text-[10px] leading-4 text-gray-400">{m}</div>
+        ))}
+        {/* ป้ายวัน + ตารางสัปดาห์ — วางทีละแถว (วัน) ข้ามทุกสัปดาห์ */}
+        {DAY_LABEL.map((d, di) => (
+          <Fragment key={`d${di}`}>
+            <div className="self-center pr-1 text-right text-[10px] text-gray-400">{d}</div>
+            {weeks.map((week, wi) => {
+              const cell = week[di]
+              if (!cell) return <div key={wi} className="aspect-square" />
+              const lv = heatLevel(cell.count, max)
+              return (
+                <div
+                  key={wi}
+                  title={`${cell.dt.getDate()} ${TH_MONTH[cell.dt.getMonth()]} · ${cell.count} แบบสอบถาม`}
+                  className="aspect-square rounded-[3px] ring-1 ring-black/[0.04]"
+                  style={{ background: HEAT_COLORS[lv] }}
+                />
+              )
+            })}
+          </Fragment>
+        ))}
+      </div>
+      </div>
+      <div className="mt-3 flex items-center justify-end gap-1 text-[10px] text-gray-400">
+        <span className="mr-1">น้อย</span>
+        {HEAT_COLORS.map((c) => <span key={c} className="size-3 rounded-[3px] ring-1 ring-black/[0.04]" style={{ background: c }} />)}
+        <span className="ml-1">มาก</span>
       </div>
     </div>
   )
 }
 
-function Card({ title, sub, children }: { title: string; sub?: string; children: React.ReactNode }) {
+export function BarVertical({ data, distributed, color, height = 210 }: { data: Named[]; distributed?: boolean; color?: string; height?: number }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-100 p-5">
-      <div className="mb-2">
-        <h3 className="text-sm font-semibold text-gray-700">{title}</h3>
-        {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
-      </div>
-      {children}
-    </div>
-  )
-}
-
-function Donut({ data, sub, title }: { data: Named[]; title: string; sub?: string }) {
-  const total = data.reduce((s, d) => s + d.value, 0)
-  return (
-    <Card title={title} sub={sub}>
-      <ChartContainer config={toConfig(data)} className="mx-auto aspect-square h-[250px]">
-        <PieChart>
-          <ChartTooltip cursor={false} content={<ChartTooltipContent nameKey="name" hideLabel />} />
-          <Pie data={data} dataKey="value" nameKey="name" innerRadius={58} strokeWidth={3} paddingAngle={2}>
-            {data.map((d) => <Cell key={d.name} fill={d.color} />)}
-            <LabelList dataKey="value" stroke="none" fontSize={12} className="fill-white font-semibold" formatter={(v: number) => (v > 0 ? v : '')} />
-            <Label content={({ viewBox }) => {
-              if (viewBox && 'cx' in viewBox) {
-                return (
-                  <text x={viewBox.cx} y={viewBox.cy} textAnchor="middle" dominantBaseline="middle">
-                    <tspan x={viewBox.cx} y={viewBox.cy} className="fill-foreground text-2xl font-bold">{total}</tspan>
-                    <tspan x={viewBox.cx} y={(viewBox.cy ?? 0) + 20} className="fill-muted-foreground text-xs">คน</tspan>
-                  </text>
-                )
-              }
-            }} />
-          </Pie>
-          <ChartLegend content={<ChartLegendContent nameKey="name" />} className="-mt-1 flex-wrap gap-x-3 [&>*]:basis-auto" />
-        </PieChart>
-      </ChartContainer>
-    </Card>
-  )
-}
-
-function BarVertical({ data, title, sub, distributed, color }: { data: Named[]; title: string; sub?: string; distributed?: boolean; color?: string }) {
-  return (
-    <Card title={title} sub={sub}>
-      <ChartContainer config={{ value: { label: 'คน', color: color ?? 'var(--chart-1)' } }} className="aspect-auto h-[210px] w-full">
-        <BarChart data={data} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
+    <>
+      <ChartContainer config={{ value: { label: 'คน', color: color ?? 'var(--chart-1)' } }} className="aspect-auto w-full" style={{ height }}>
+        <BarChart data={data} margin={{ top: 22, right: 8, left: 8, bottom: 0 }}>
           <CartesianGrid vertical={false} />
           <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} interval={0} fontSize={11} />
-          <YAxis tickLine={false} axisLine={false} width={28} allowDecimals={false} fontSize={11} />
+          <YAxis hide allowDecimals={false} />
           <ChartTooltip cursor={{ fill: 'var(--muted)' }} content={<ChartTooltipContent />} />
           <Bar dataKey="value" radius={[6, 6, 0, 0]} fill={distributed ? undefined : 'var(--color-value)'}>
             {distributed && data.map((d) => <Cell key={d.name} fill={d.color} />)}
-            <LabelList dataKey="value" position="top" offset={6} fontSize={11} className="fill-gray-600" formatter={(v: number) => (v > 0 ? v : '')} />
+            <LabelList dataKey="value" position="top" offset={6} fontSize={11} className="fill-gray-600" formatter={(v: number) => (v > 0 ? v.toLocaleString() : '')} />
           </Bar>
         </BarChart>
       </ChartContainer>
-    </Card>
+    </>
   )
 }
 
-function BarHorizontal({ data, title, sub, distributed, color }: { data: Named[]; title: string; sub?: string; distributed?: boolean; color?: string }) {
+export function BarHorizontal({ data, distributed, color, height = 210 }: { data: Named[]; distributed?: boolean; color?: string; height?: number }) {
   return (
-    <Card title={title} sub={sub}>
-      <ChartContainer config={{ value: { label: 'คน', color: color ?? 'var(--chart-4)' } }} className="aspect-auto h-[210px] w-full">
-        <BarChart data={data} layout="vertical" margin={{ top: 4, right: 12, left: 4, bottom: 0 }}>
+    <>
+      <ChartContainer config={{ value: { label: 'คน', color: color ?? 'var(--chart-4)' } }} className="aspect-auto w-full" style={{ height }}>
+        <BarChart data={data} layout="vertical" margin={{ top: 4, right: 44, left: 4, bottom: 0 }}>
           <CartesianGrid horizontal={false} />
           <XAxis type="number" tickLine={false} axisLine={false} allowDecimals={false} fontSize={11} />
           <YAxis type="category" dataKey="name" tickLine={false} axisLine={false} width={92} fontSize={11} />
           <ChartTooltip cursor={{ fill: 'var(--muted)' }} content={<ChartTooltipContent />} />
-          <Bar dataKey="value" radius={[0, 5, 5, 0]} fill={distributed ? undefined : 'var(--color-value)'}>
+          <Bar dataKey="value" radius={[0, 5, 5, 0]} maxBarSize={22} fill={distributed ? undefined : 'var(--color-value)'}>
             {distributed && data.map((d) => <Cell key={d.name} fill={d.color} />)}
-            <LabelList dataKey="value" position="right" offset={6} fontSize={11} className="fill-gray-600" formatter={(v: number) => (v > 0 ? v : '')} />
+            <LabelList dataKey="value" position="right" offset={6} fontSize={11} className="fill-gray-600" formatter={(v: number) => (v > 0 ? v.toLocaleString() : '')} />
           </Bar>
         </BarChart>
       </ChartContainer>
-    </Card>
+    </>
   )
 }
 
 // BMI เวอร์ชันมินิ — ไม่มีการ์ดขาว ใช้วางในแผงเทาคู่กับ heatmap
-export function BmiMini({ data }: { data: Named[] }) {
-  return (
-    <div>
-      <h3 className="text-[13px] font-medium text-gray-600">
-        การกระจาย BMI <span className="font-normal text-gray-400">· เกณฑ์ Asia-Pacific</span>
-      </h3>
-      <ChartContainer config={{ value: { label: 'คน' } }} className="mt-2 aspect-auto h-[118px] w-full">
-        <BarChart data={data} margin={{ top: 6, right: 6, left: -22, bottom: 0 }} barCategoryGap="28%">
-          <CartesianGrid vertical={false} />
-          <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} interval={0} fontSize={10} />
-          <YAxis tickLine={false} axisLine={false} width={28} allowDecimals={false} fontSize={10} />
-          <ChartTooltip cursor={{ fill: 'var(--muted)' }} content={<ChartTooltipContent />} />
-          <Bar dataKey="value" radius={[5, 5, 0, 0]} maxBarSize={34}>
-            {data.map((d) => <Cell key={d.name} fill={d.color} />)}
-            <LabelList dataKey="value" position="top" offset={5} fontSize={10} className="fill-gray-600" formatter={(v: number) => (v > 0 ? v : '')} />
-          </Bar>
-        </BarChart>
-      </ChartContainer>
-    </div>
-  )
-}
-
-export default function DashboardCharts({ data, provinceStats }: { data: ChartsData; provinceStats: ProvinceStat[] }) {
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-      <Donut data={data.risk} title="ระดับความเสี่ยงการดื่ม (AUDIT)" sub="ตามเกณฑ์ WHO / ศวส." />
-      <Donut data={data.gender} title="เพศของผู้ตอบ" />
-      <BarHorizontal data={data.smoke} title="สถานะการสูบบุหรี่" distributed />
-      <BarVertical data={data.age} title="ช่วงอายุผู้ตอบ" distributed />
-      <BarHorizontal data={data.province} title="พื้นที่เก็บข้อมูล (จังหวัด)" sub="กระจายตามจังหวัด" color="#16A34A" />
-      <DashboardMiniMap stats={provinceStats} />
-    </div>
-  )
-}

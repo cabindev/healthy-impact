@@ -138,7 +138,11 @@ choropleth ความเข้มข้นการเก็บข้อมู
 - โลโก้ "Healthy Impact" ใน Sidebar ลิงก์ไป `/` และ `app/page.tsx` **ไม่ redirect admin แล้ว** (แสดงปุ่มเข้าแดชบอร์ดแทน) — ตอน login `SignInForm.tsx` พา admin ไป `/dashboard` เองอยู่แล้ว
 
 ## 📊 Dashboard + Seed
-- **Dashboard กราฟ** (`app/dashboard/page.tsx` aggregate + `components/DashboardCharts.tsx`): ใช้ **shadcn charts** (Recharts v2 + `components/ui/chart.tsx` + theme tokens ใน globals.css + `cn` ที่ `app/lib/utils.ts`). KPI 6 ใบ + area รายวัน, donut ความเสี่ยง AUDIT/เพศ (center total), bar บุหรี่/อายุ/BMI/จังหวัด. นับเฉพาะ eligible
+- **Dashboard** (`app/dashboard/page.tsx`) จัด 3 หมวด: ① ผลกระทบ (`RateCard` อัตรา % + จำนวนจริง + เทียบภาพรวมเมื่อเลือกจังหวัด; `ShareBar` AUDIT/บุหรี่) · ② ผู้ตอบ (เพศ ShareBar, อายุ/BMI แท่ง) · ③ การดำเนินงาน (จำนวน/คัดออก/ตรวจแล้ว + heatmap รายวันเต็มความกว้าง ย้อนหลัง 1 ปี + พื้นที่ + แผนที่ย่อ). นับผลกระทบเฉพาะ eligible
+  - ตัวชี้วัดคิดเป็น **%** (ความชุกตาม สสส.): ดื่ม/AUDIT≥8/สูบ = % ผู้เข้าเกณฑ์ · เมาแล้วขับ = % **ผู้ดื่ม**; `impactOf()` ใช้คำนวณทั้งจังหวัดและภาพรวมประเทศ
+  - **เลิกใช้โดนัทแล้ว** (5 กลุ่ม ชิ้นเล็กอ่านยาก) → `components/DashboardStats.tsx` (server, ไม่ใช้ Recharts); Recharts เหลือแค่แท่งใน `DashboardCharts.tsx` (`BarVertical`/`BarHorizontal` ซ่อนแกน Y + margin บนเผื่อป้ายตัวเลข ไม่งั้นเลข 4 หลักล้นขอบ)
+  - `TrendHeatmap` ใช้ CSS grid ช่องยืด `minmax(10px,1fr)` (จอแคบเลื่อนแนวนอน) — อย่ากลับไปล็อก 12px จะเหลือที่ว่างครึ่งกล่อง
+  - shadcn charts = Recharts v2 + `components/ui/chart.tsx` + theme tokens ใน globals.css
   - **หมายเหตุ:** เคยลอง ApexCharts แต่ `react-apexcharts` พังกับ React 19 (`reading 'node'`) → ย้ายมา shadcn/Recharts v2 (อย่าใช้ react-apexcharts)
 - **Seed ทดสอบ:** `node prisma/seed.mjs` → สร้าง 50 รายการสมจริง (44 เข้าเกณฑ์ + 6 ไม่เข้าเกณฑ์) **⚠️ ลบข้อมูล survey เดิมทั้งหมดก่อน seed**
 
@@ -149,6 +153,19 @@ choropleth ความเข้มข้นการเก็บข้อมู
 - หน้าละ 50 (`PAGE_SIZE` ใน `surveys/page.tsx`) ผ่าน `?page=` + `Pagination.tsx` (server, ลิงก์คงตัวกรองเดิม); หน้าเกินจำนวนจริงถูก clamp
 - เปลี่ยนคำค้น/ตัวกรอง (`SearchBox`/`AreaFilter`) ต้อง `params.delete('page')` กลับหน้า 1; Export ไม่สนหน้า (ทั้งชุดที่กรอง)
 - `SurveyTable key={page}` → เปลี่ยนหน้าแล้วล้างรายการที่ติ๊กไว้
+
+## 🍺 สรุปผู้ดื่มตามพื้นที่ (หน้ารายการแบบสอบถาม)
+- ผู้ใช้ (จังหวัด) เคย export ไปนับใน Excel เอง → ทำ `DrinkSummaryTable.tsx` (`<details open>`) เหนือตารางรายการ
+- นับเฉพาะ eligible แยก 5 กลุ่ม: ไม่ดื่ม + 4 กลุ่ม AUDIT (นิยาม "ไม่ดื่ม" เดียวกับโดนัทหน้าภาพรวม) + รวมผู้ดื่ม/รวมทั้งหมด
+- แถว = ระดับถัดลงจากตัวกรอง (`nextLevel()`): ไม่เลือก→จังหวัด · จังหวัด→อำเภอ · อำเภอ→ตำบล · ตำบล→หมู่บ้าน; กดชื่อเพื่อเจาะลง
+- logic ที่เดียว `app/lib/drink-summary.ts` (`getDrinkSummary`) ใช้ทั้งหน้าและ export `app/api/report/drink-summary/route.ts`
+- ซ่อนเมื่ออยู่ในโหมด `noArea`
+- กลุ่ม/สี/นิยาม "ไม่ดื่ม" อยู่ที่ `app/lib/drink-groups.ts` (ไม่แตะ prisma → ใช้ฝั่ง client ได้) — อย่าก๊อปไปนิยามซ้ำ
+
+## 🗺️→📊 ดูรายจังหวัด: แผนที่ = เทียบจังหวัด · ภาพรวม = เจาะลึก
+- `ProvinceStat` มี `drinkers` + `drink` (นับ eligible) สร้างด้วย `buildProvinceStats()` ใน `map-heat.ts` (ใช้ทั้งหน้าแผนที่และแผนที่ย่อ)
+- แผนที่: metric "ผู้ดื่ม" + แผงจังหวัดมี `map/DrinkProfile.tsx` (อัตราผู้ดื่มเทียบภาพรวม, AUDIT ≥ 8, แถบสัดส่วน 5 กลุ่ม) + ปุ่ม "ภาพรวมจังหวัด" → `/dashboard?province=`
+- ภาพรวม `?province=`: `ProvinceSelect.tsx` (Base UI Combobox ค้นหาได้ ครบ 77 จังหวัด + `autoHighlight` ให้ Enter เลือกได้) ที่หัวหน้า; KPI/กราฟทั้งหมดกรองจังหวัด (filter ใน memory จาก `allSurveys`), กราฟพื้นที่แตกเป็นอำเภอ, แผนที่ย่อยังเป็นทั้งประเทศ
 
 ## ยังไม่ได้ทำ (next steps)
 - กรองช่วงเวลา/พื้นที่ ก่อน export

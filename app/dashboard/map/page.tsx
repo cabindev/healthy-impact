@@ -3,7 +3,7 @@ import dynamicImport from 'next/dynamic'
 import { prisma } from '@/app/lib/prisma'
 import Link from 'next/link'
 import { ClipboardList, CircleCheck, CheckCheck, MapPinned, Info } from 'lucide-react'
-import type { ProvinceStat } from './MapView'
+import { buildProvinceStats } from '@/app/lib/map-heat'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,26 +14,18 @@ const MapView = dynamicImport(() => import('./MapView'), {
 
 export default async function MapPage() {
   await requireAdminPage()
-  let rows: { province: string | null; eligible: boolean; verifiedAt: Date | null }[] = []
+  let rows: Parameters<typeof buildProvinceStats>[0] = []
   let dbError = false
   try {
-    rows = await prisma.survey.findMany({ select: { province: true, eligible: true, verifiedAt: true } })
+    rows = await prisma.survey.findMany({
+      select: { province: true, eligible: true, verifiedAt: true, alcohol: { select: { q1Frequency: true, riskLevel: true } } },
+    })
   } catch (err) {
     console.warn('[map] เชื่อมต่อฐานข้อมูลไม่ได้:', err instanceof Error ? err.message : err)
     dbError = true
   }
 
-  const m = new Map<string, ProvinceStat>()
-  for (const r of rows) {
-    const p = r.province?.trim()
-    if (!p) continue
-    const s = m.get(p) ?? { province: p, total: 0, eligible: 0, verified: 0 }
-    s.total += 1
-    if (r.eligible) s.eligible += 1
-    if (r.verifiedAt) s.verified += 1
-    m.set(p, s)
-  }
-  const stats = [...m.values()].sort((a, b) => b.total - a.total)
+  const stats = buildProvinceStats(rows)
   const covered = stats.length
   const totalRecords = stats.reduce((sum, s) => sum + s.total, 0)
   const noProvince = rows.length - totalRecords
